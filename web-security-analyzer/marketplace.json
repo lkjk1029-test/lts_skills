@@ -1,0 +1,8 @@
+{
+  "name": "web-security-analyzer",
+  "description": "Website security analyzer with Excel report generation",
+  "version": "1.0.0",
+  "author": "lkjk1029-test",
+  "license": "MIT",
+  "main": "SKILL.md"
+}

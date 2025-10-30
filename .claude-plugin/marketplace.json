@@ -1,0 +1,22 @@
+{
+  "name": "letsecu-agent-skills",
+  "owner": {
+    "name": "mhkim",
+    "email": "lkjk1029@letsecu.com"
+  },
+  "metadata": {
+    "description": "letsecu skills",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "web-security-analyzer",
+      "description": "Website security analyzer with report generatio",
+      "source": "./",
+      "strict": false,
+      "skills": [
+        "./web-security-analyzer-skills/xlsx"
+      ]
+    },
+  ]
+}

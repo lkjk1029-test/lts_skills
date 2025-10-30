@@ -743,10 +743,10 @@ async def analyze_website(target_url: str, username: Optional[str] = None, passw
 
         print(f"🎯 Playwright 발견 요소: {len(clickable_elements)}개")
 
-        # 각 요소 클릭 및 분석
-        for i, element in enumerate(clickable_elements[:5]):  # 최대 5개 클릭
+        # 각 요소 클릭 및 분석 (모든 요소 클릭)
+        for i, element in enumerate(clickable_elements):
             try:
-                print(f"🖱️ [{i+1}/5] Playwright 클릭: {element.get('text', '')}")
+                print(f"🖱️ [{i+1}/{len(clickable_elements)}] Playwright 클릭: {element.get('text', '')}")
 
                 # 클릭 전 상태 저장
                 before_url = await mcp__playwright__evaluate_script("() => window.location.href")

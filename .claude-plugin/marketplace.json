@@ -17,6 +17,6 @@
       "skills": [
         "./web-security-analyzer-skills/xlsx"
       ]
-    },
+    }
   ]
 }

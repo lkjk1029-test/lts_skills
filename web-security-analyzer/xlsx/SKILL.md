@@ -18,7 +18,133 @@ description: Comprehensive web security vulnerability analyzer that crawls entir
 
 ## 분석 절차
 
-### 1. 입력 정보 수집
+### 1. 의존성 확인
+
+스킬 실행을 시작하기 전 필수 의존성을 확인하고 설치한다:
+
+```python
+import subprocess
+import sys
+import importlib
+from typing import Dict, List, Any
+
+def check_mcp_servers() -> Dict[str, bool]:
+    """MCP 서버 설치 여부 확인"""
+    mcp_status = {
+        'chrome-devtools': False,
+        'playwright': False
+    }
+
+    print("🔍 MCP 서버 설치 여부 확인 중...")
+
+    # Chrome DevTools MCP 확인
+    try:
+        # mcp__chrome_devtools__list_pages 같은 함수 호출로 확인
+        test_result = mcp__chrome_devtools__list_pages()
+        mcp_status['chrome-devtools'] = True
+        print("✅ Chrome DevTools MCP 설치됨")
+    except Exception as e:
+        print(f"❌ Chrome DevTools MCP 미설치 또는 오류: {str(e)}")
+
+    # Playwright MCP 확인
+    try:
+        # mcp__playwright__new_page 같은 함수 호출로 확인
+        test_result = mcp__playwright__new_page("about:blank")
+        mcp_status['playwright'] = True
+        print("✅ Playwright MCP 설치됨")
+    except Exception as e:
+        print(f"❌ Playwright MCP 미설치 또는 오류: {str(e)}")
+
+    return mcp_status
+
+def install_python_libraries() -> bool:
+    """필수 파이썬 라이브러리 설치 확인 및 설치"""
+    required_libraries = {
+        'pandas': 'pandas',
+        'openpyxl': 'openpyxl',
+        'chardet': 'chardet',
+        'requests': 'requests'
+    }
+
+    missing_libs = []
+
+    print("🔍 파이썬 라이브러리 확인 중...")
+
+    # 라이브러리 설치 여부 확인
+    for lib_name, package_name in required_libraries.items():
+        try:
+            importlib.import_module(lib_name)
+            print(f"✅ {lib_name} 설치됨")
+        except ImportError:
+            print(f"❌ {lib_name} 미설치")
+            missing_libs.append(package_name)
+
+    # 누락된 라이브러리 설치
+    if missing_libs:
+        print(f"📦 누락된 라이브러리 설치 중: {', '.join(missing_libs)}")
+
+        for package in missing_libs:
+            try:
+                print(f"📥 {package} 설치 중...")
+                subprocess.check_call([
+                    sys.executable, '-m', 'pip', 'install', package, '--quiet'
+                ])
+                print(f"✅ {package} 설치 성공")
+            except subprocess.CalledProcessError as e:
+                print(f"❌ {package} 설치 실패: {str(e)}")
+                return False
+
+        print("🎉 모든 라이브러리 설치 완료")
+
+    return True
+
+def validate_dependencies() -> bool:
+    """스킬 실행 의존성 유효성 검사"""
+    print("=" * 50)
+    print("🚀 웹 보안 분석기 스킬 - 의존성 확인")
+    print("=" * 50)
+
+    # 1. MCP 서버 확인
+    mcp_status = check_mcp_servers()
+
+    # 둘 다 설치되어 있지 않으면 종료
+    if not any(mcp_status.values()):
+        print("\n" + "=" * 50)
+        print("❌ 스킬 실행 불가")
+        print("=" * 50)
+        print("필수 MCP 서버가 설치되어 있지 않습니다:")
+        print("  • Chrome DevTools MCP (브라우저 자동화)")
+        print("  • Playwright MCP (웹 페이지 테스트)")
+        print("\n설치 방법:")
+        print("  Claude Code 설정에서 MCP 서버를 설치해주세요.")
+        print("  자세한 설명: https://docs.claude.com/claude-code/mcp")
+        print("=" * 50)
+        return False
+
+    # 최소 하나라도 있으면 경고 메시지
+    if not all(mcp_status.values()):
+        missing_servers = [name for name, installed in mcp_status.items() if not installed]
+        print(f"\n⚠️ 일부 MCP 서버 미설치: {', '.join(missing_servers)}")
+        print("스킬 기능이 제한될 수 있습니다.")
+
+    # 2. 파이썬 라이브러리 설치
+    if not install_python_libraries():
+        print("\n❌ 필수 라이브러리 설치 실패")
+        print("스킬을 실행할 수 없습니다.")
+        return False
+
+    print("\n" + "=" * 50)
+    print("✅ 의존성 확인 완료 - 스킬 실행 가능")
+    print("=" * 50)
+    return True
+
+# 스킬 시작 전 의존성 확인
+if not validate_dependencies():
+    raise Exception("스킬 실행을 위한 의존성이 충족되지 않습니다.")
+
+```
+
+### 2. 입력 정보 수집
 
 분석을 시작하기 전 다음 정보를 수집한다:
 - **대상 URL**: 분석할 웹사이트의 기본 URL
@@ -26,7 +152,7 @@ description: Comprehensive web security vulnerability analyzer that crawls entir
 - **패스워드**: 로그인이 필요한 경우 (선택사항)
 - **분석 깊이**: 사이트 전체 또는 특정 영역 (기본값: 전체)
 
-### 2. 사이트 전체 탐색 및 크롤링
+### 3. 사이트 전체 탐색 및 크롤링
 
 Chrome DevTools를 사용하여 사이트 전체를 체계적으로 탐색한다. 에러 핸들링과 안정성을 최우선으로 고려한다:
 
@@ -254,7 +380,7 @@ except Exception as e:
     menu_analysis = menu_analysis if 'menu_analysis' in locals() else []
 ```
 
-### 3. 페이지별 상세 보안 분석
+### 4. 페이지별 상세 보안 분석
 
 각 페이지에 대해 종합적인 보안 분석을 수행한다:
 
@@ -437,7 +563,7 @@ async def analyze_page_security(url: str, menu_text: str) -> Optional[Dict[str, 
         return None
 ```
 
-### 4. 취약점 패턴 분석 (공격 없음)
+### 5. 취약점 패턴 분석 (공격 없음)
 
 XSS, SQL Injection 등 다양한 취약점 패턴을 분석한다:
 
@@ -726,7 +852,7 @@ async def analyze_vulnerability_patterns_safe(url: str, forms: List[Dict]) -> Li
         return []
 ```
 
-### 5. 엑셀 보고서 생성 (개선된 정확성)
+### 6. 엑셀 보고서 생성 (개선된 정확성)
 
 분석 결과를 중복 제거하고 정확도를 높여 메뉴별 컬럼 형태의 엑셀 보고서로 생성한다:
 
@@ -735,8 +861,82 @@ import sys
 import os
 from datetime import datetime, timezone
 from typing import List, Dict, Any
+import pandas as pd
+import chardet
+
 sys.path.append(os.path.join(os.path.dirname(__file__), 'xlsx', 'scripts'))
 from excel_generator import ExcelReportGenerator
+
+def detect_file_encoding(file_path: str) -> str:
+    """파일 인코딩 자동 감지"""
+    try:
+        with open(file_path, 'rb') as f:
+            result = chardet.detect(f.read(10000))  # 앞 10KB만 읽어서 감지
+        detected_encoding = result.get('encoding', 'utf-8')
+        confidence = result.get('confidence', 0)
+
+        print(f"감지된 인코딩: {detected_encoding} (신뢰도: {confidence:.2f})")
+
+        # 신뢰도가 낮거나 감지 실패 시 일반적인 한글 인코딩 시도
+        if confidence < 0.7 or not detected_encoding:
+            for encoding in ['utf-8', 'cp949', 'euc-kr', 'utf-8-sig']:
+                try:
+                    with open(file_path, 'r', encoding=encoding) as test_file:
+                        test_file.read(1000)  # 일단 읽어보기
+                    print(f"성공적인 인코딩: {encoding}")
+                    return encoding
+                except (UnicodeDecodeError, LookupError):
+                    continue
+
+        return detected_encoding if detected_encoding else 'utf-8'
+    except Exception as e:
+        print(f"인코딩 감지 실패: {str(e)}, 기본값 utf-8 사용")
+        return 'utf-8'
+
+def safe_read_csv(file_path: str) -> pd.DataFrame:
+    """안전한 CSV 파일 읽기 (인코딩 자동 감지)"""
+    if not os.path.exists(file_path):
+        raise FileNotFoundError(f"CSV 파일을 찾을 수 없습니다: {file_path}")
+
+    # 인코딩 감지
+    encoding = detect_file_encoding(file_path)
+
+    # 여러 인코딩으로 시도
+    encodings_to_try = [encoding, 'utf-8', 'utf-8-sig', 'cp949', 'euc-kr', 'latin-1']
+
+    for enc in encodings_to_try:
+        try:
+            print(f"CSV 읽기 시도 (인코딩: {enc}): {file_path}")
+            df = pd.read_csv(file_path, encoding=enc)
+            print(f"CSV 파일 성공적으로 읽음: {len(df)}개 행, 인코딩: {enc}")
+            return df
+        except (UnicodeDecodeError, LookupError) as e:
+            print(f"인코딩 {enc} 실패: {str(e)}")
+            continue
+        except Exception as e:
+            print(f"CSV 읽기 중 오류 (인코딩: {enc}): {str(e)}")
+            continue
+
+    raise Exception(f"CSV 파일을 어떤 인코딩으로도 읽을 수 없습니다: {file_path}")
+
+# CSV 파일 읽기 예시 (필요시 사용)
+# def load_csv_data(csv_file_path: str) -> pd.DataFrame:
+#     """CSV 파일을 안전하게 읽어서 분석 데이터로 변환"""
+#     try:
+#         df = safe_read_csv(csv_file_path)
+#
+#         # 필요한 컬럼이 있는지 확인
+#         required_columns = ['menu', 'url', 'vulnerability_type', 'severity']
+#         missing_columns = [col for col in required_columns if col not in df.columns]
+#
+#         if missing_columns:
+#             print(f"경고: 필요한 컬럼이 없습니다: {missing_columns}")
+#             print(f"사용 가능한 컬럼: {list(df.columns)}")
+#
+#         return df
+#     except Exception as e:
+#         print(f"CSV 파일 로드 실패: {str(e)}")
+#         return pd.DataFrame()
 
 def process_analysis_results(menu_analysis: List[Dict[str, Any]]) -> List[Dict[str, str]]:
     """분석 결과를 전처리하고 중복을 제거"""
@@ -1237,9 +1437,35 @@ except Exception as e:
 - 엑셀 보고서 생성 완료
 - 분석 결과 요약 보고 제공
 
+## CSV 파일 처리 사용법
+
+한글로 된 CSV 파일을 처리할 때는 다음과 같이 `safe_read_csv` 함수를 사용한다:
+
+```python
+# CSV 파일 읽기 예시
+try:
+    # 현재 작업 디렉토리의 CSV 파일 읽기
+    csv_file = "jupyterlab_security_analysis_raw.csv"
+    df = safe_read_csv(csv_file)
+
+    print(f"CSV 파일 로드 성공: {len(df)}개 행")
+    print(f"컬럼: {list(df.columns)}")
+
+    # 데이터 처리 후 엑셀 보고서 생성
+    processed_data = process_analysis_results(df.to_dict('records'))
+    generator = ExcelReportGenerator(processed_data)
+    generator.create_detailed_report("security_report_from_csv.xlsx")
+
+except FileNotFoundError:
+    print(f"CSV 파일을 찾을 수 없습니다: {csv_file}")
+except Exception as e:
+    print(f"CSV 처리 중 오류 발생: {str(e)}")
+```
+
 ## 중요 사항
 
 - 이 스킬은 실제 공격을 수행하지 않고 코드 패턴 분석만 수행
 - 모든 분석은 Chrome DevTools를 통한 안전한 방식으로 진행
 - 결과는 취약점 가능성을 나타내며, 전문가의 추가 검토 필요
 - 분석 대상 사이트의 약관과 robots.txt 준수 필수
+- CSV 파일 처리 시 인코딩 문제를 자동으로 해결하며, 한글(UTF-8, CP949, EUC-KR) 인코딩을 지원

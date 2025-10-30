@@ -2822,7 +2822,7 @@ async def analyze_page_security(url: str, menu_text: str, element_info: Dict[str
 
         # 10. 결과 정리 및 중복 제거
         return {
-            'menu': menu_text or '알 수 없는 메뉴',
+            'menu': _generate_menu_name(menu_text, element_info) or '알 수 없는 메뉴',
             'url': url,
             'forms': forms or [],
             'api_endpoints': all_api_endpoints,
@@ -3154,6 +3154,53 @@ if sys.platform == 'win32':
 
 sys.path.append(os.path.join(os.path.dirname(__file__), 'xlsx', 'scripts'))
 from excel_generator import ExcelReportGenerator
+
+def _generate_menu_name(menu_text: str, element_info: Dict[str, Any] = None) -> str:
+    """클릭 대상 정보를 포함한 메뉴 이름 생성"""
+    if not menu_text and not element_info:
+        return '알 수 없는 메뉴'
+
+    try:
+        # 기본 메뉴 텍스트 정리
+        menu_name = menu_text.strip() if menu_text else ''
+
+        # 요소 정보가 있으면 상세 정보 추가
+        if element_info:
+            element_type = element_info.get('elementType', '')
+            selector = element_info.get('selector', '')
+
+            # 요소 타입 한글화
+            type_mapping = {
+                'button': '버튼',
+                'submit': '제출버튼',
+                'link': '링크',
+                'input': '입력필드',
+                'form': '폼',
+                'dropdown': '드롭다운',
+                'checkbox': '체크박스',
+                'radio': '라디오버튼',
+                'image': '이미지',
+                'div': '영역',
+                'span': '텍스트영역'
+            }
+
+            korean_type = type_mapping.get(element_type.lower(), element_type.upper())
+
+            # 메뉴 이름이 너무 길면 줄이기
+            if len(menu_name) > 30:
+                menu_name = menu_name[:30] + '...'
+
+            # 최종 메뉴 이름 생성
+            if menu_name:
+                return f"{menu_name} ({korean_type})"
+            else:
+                return f"{korean_type} - {selector[:20]}" if selector else korean_type
+
+        return menu_name or '알 수 없는 메뉴'
+
+    except Exception as e:
+        print(f"메뉴 이름 생성 오류: {str(e)}")
+        return menu_text or '알 수 없는 메뉴'
 
 def detect_file_encoding(file_path: str) -> str:
     """파일 인코딩 자동 감지"""
@@ -3678,7 +3725,7 @@ except Exception as e:
 
 | 컬럼명 | 설명 |
 |--------|------|
-| 메뉴 | 내비게이션 메뉴 이름 |
+| 메뉴 | 클릭한 대상 정보 (버튼, 링크 등) |
 | URL | 해당 페이지 URL |
 | 요소유형 | FORM, API, LINK 등 요소 분류 |
 | 요소명 | 폼 액션, API 엔드포인트 등 |

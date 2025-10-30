@@ -1,6 +1,6 @@
 ---
 name: web-security-analyzer
-description: 웹사이트 구조 분석 및 보안 취약점 확인 후 엑셀 보고서 생성. 웹 URL, 아이디/패스워드(선택사항)를 입력받아 사이트의 메뉴, 메소드, URL 경로, 파라미터, 취약점 가능성, 로그인 필요 여부를 분석하고 정리된 엑셀 파일을 생성한다. 이 스킬은 웹사이트의 기본적인 구조 분석과 보안 상태 점검이 필요할 때 사용한다.
+description: Analyze website structure and security vulnerabilities, then generate Excel reports. Takes URL and optional credentials to analyze site menus, methods, URL paths, parameters, vulnerability potential, and authentication requirements.
 ---
 
 # 웹 보안 분석기 스킬

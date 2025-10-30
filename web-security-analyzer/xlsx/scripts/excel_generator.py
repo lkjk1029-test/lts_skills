@@ -11,7 +11,7 @@ from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
 from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.chart import BarChart, Reference
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 from typing import Dict, List, Any
 
@@ -27,7 +27,9 @@ class ExcelReportGenerator:
         """메뉴별 상세 보고서 생성 함수"""
 
         if output_filename is None:
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            # 현재 한국 시간으로 날짜 생성
+            kst = datetime.now(timezone('Asia/Seoul'))
+            timestamp = kst.strftime("%Y%m%d_%H%M%S")
             output_filename = f"web_security_analysis_{timestamp}.xlsx"
 
         # 워크북 생성
@@ -63,10 +65,16 @@ class ExcelReportGenerator:
             "패턴", "인증필요", "권장조치"
         ]
 
-        # 헤더 추가
+        # 헤더 추가 (한글 폰트 지원)
         for col_idx, header in enumerate(headers, 1):
-            cell = ws.cell(row=self.current_row, column=col_idx, value=header)
-            cell.font = Font(bold=True, color="FFFFFF")
+            # 한글 헤더 처리
+            try:
+                normalized_header = header.encode('utf-8').decode('utf-8')
+            except (UnicodeEncodeError, UnicodeDecodeError):
+                normalized_header = header
+
+            cell = ws.cell(row=self.current_row, column=col_idx, value=normalized_header)
+            cell.font = Font(bold=True, color="FFFFFF", name="맑은 고딕")
             cell.fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
             cell.alignment = Alignment(horizontal="center", vertical="center")
             cell.border = Border(
@@ -84,22 +92,34 @@ class ExcelReportGenerator:
             # 기존 형식을 새로운 형식으로 변환
             data_rows = self._convert_legacy_format(self.analysis_results)
 
-        # 데이터 행 추가
+        # 데이터 행 추가 (한글 인코딩 지원)
         for row_data in data_rows:
             for col_idx, header in enumerate(headers, 1):
                 value = row_data.get(header, "")
                 if value is None:
                     value = ""
 
-                cell = ws.cell(row=self.current_row, column=col_idx, value=value)
+                # 한글 값 처리
+                if isinstance(value, str):
+                    try:
+                        normalized_value = value.encode('utf-8').decode('utf-8')
+                    except (UnicodeEncodeError, UnicodeDecodeError):
+                        normalized_value = value
+                else:
+                    normalized_value = value
+
+                cell = ws.cell(row=self.current_row, column=col_idx, value=normalized_value)
+
+                # 한글 폰트 설정
+                cell.font = Font(name="맑은 고딕")
 
                 # 위험도에 따른 색상 지정
                 if header == "위험도":
-                    if str(value).upper() == "HIGH":
+                    if str(normalized_value).upper() == "HIGH":
                         cell.fill = PatternFill(start_color="FFE6E6", end_color="FFE6E6", fill_type="solid")
-                    elif str(value).upper() == "MEDIUM":
+                    elif str(normalized_value).upper() == "MEDIUM":
                         cell.fill = PatternFill(start_color="FFF4E6", end_color="FFF4E6", fill_type="solid")
-                    elif str(value).upper() == "LOW":
+                    elif str(normalized_value).upper() == "LOW":
                         cell.fill = PatternFill(start_color="E6F3FF", end_color="E6F3FF", fill_type="solid")
 
                 # 테두리 추가
@@ -213,9 +233,11 @@ class ExcelReportGenerator:
         # 기본 정보
         if isinstance(self.analysis_results, list):
             # 새로운 형식의 데이터 처리
+            # 현재 한국 시간으로 날짜 생성
+            kst = datetime.now(timezone('Asia/Seoul'))
             summary_data = [
                 ["분석 대상", "웹사이트 전체"],
-                ["분석 시간", datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
+                ["분석 시간", kst.strftime("%Y-%m-%d %H:%M:%S")],
                 ["총 분석 항목", len(self.analysis_results)],
                 ["분석 방식", "Chrome DevTools + 패턴 분석"],
             ]
@@ -238,10 +260,13 @@ class ExcelReportGenerator:
             basic_info = self.analysis_results.get('basic_info', {})
             security_info = self.analysis_results.get('security', {})
 
+            # 현재 한국 시간으로 날짜 생성
+            kst = datetime.now(timezone('Asia/Seoul'))
+
             summary_data = [
                 ["분석 대상 URL", basic_info.get('url', 'N/A')],
                 ["사이트 제목", basic_info.get('title', 'N/A')],
-                ["분석 시간", datetime.now().strftime("%Y-%m-%d %H:%M:%S")],
+                ["분석 시간", kst.strftime("%Y-%m-%d %H:%M:%S")],
                 ["프로토콜", basic_info.get('protocol', 'N/A')],
                 ["HTTPS 사용", "예" if security_info.get('isHTTPS') else "아니오"],
                 ["총 폼 수", len(self.analysis_results.get('forms', []))],
@@ -333,28 +358,55 @@ class ExcelReportGenerator:
 
     # 보조 메소드들
     def _add_title(self, ws, title):
-        """제목 추가"""
-        cell = ws.cell(row=self.current_row, column=1, value=title)
-        cell.font = Font(bold=True, size=16, color="366092")
+        """제목 추가 (한글 폰트 지원)"""
+        # 한글 제목 처리
+        try:
+            normalized_title = title.encode('utf-8').decode('utf-8')
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            normalized_title = title
+
+        cell = ws.cell(row=self.current_row, column=1, value=normalized_title)
+        cell.font = Font(bold=True, size=16, color="366092", name="맑은 고딕")
         self.current_row += 2
 
     def _add_subtitle(self, ws, subtitle):
-        """부제목 추가"""
-        cell = ws.cell(row=self.current_row, column=1, value=subtitle)
-        cell.font = Font(bold=True, size=12)
+        """부제목 추가 (한글 폰트 지원)"""
+        # 한글 부제목 처리
+        try:
+            normalized_subtitle = subtitle.encode('utf-8').decode('utf-8')
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            normalized_subtitle = subtitle
+
+        cell = ws.cell(row=self.current_row, column=1, value=normalized_subtitle)
+        cell.font = Font(bold=True, size=12, name="맑은 고딕")
         self.current_row += 1
 
     def _add_table(self, ws, data, start_col=1, start_row=None):
-        """테이블 추가"""
+        """테이블 추가 (한글 인코딩 지원)"""
         if start_row is None:
             start_row = self.current_row
 
         for row_idx, row_data in enumerate(data, start_row):
             for col_idx, value in enumerate(row_data, start_col):
-                cell = ws.cell(row=row_idx, column=col_idx, value=value)
+                # 한글 포함 값 처리
+                if isinstance(value, str):
+                    # Unicode 정규화로 한글 깨짐 방지
+                    try:
+                        normalized_value = value.encode('utf-8').decode('utf-8')
+                    except (UnicodeEncodeError, UnicodeDecodeError):
+                        normalized_value = value
+                else:
+                    normalized_value = value
+
+                cell = ws.cell(row=row_idx, column=col_idx, value=normalized_value)
+
                 if row_idx == start_row:  # 헤더 행
-                    cell.font = Font(bold=True)
+                    cell.font = Font(bold=True, name="맑은 고딕")
                     cell.fill = PatternFill(start_color="F2F2F2", end_color="F2F2F2", fill_type="solid")
+                else:
+                    # 데이터 행은 한글 지원 폰트 설정
+                    cell.font = Font(name="맑은 고딕")
+
                 cell.border = Border(
                     left=Side(style="thin"), right=Side(style="thin"),
                     top=Side(style="thin"), bottom=Side(style="thin")

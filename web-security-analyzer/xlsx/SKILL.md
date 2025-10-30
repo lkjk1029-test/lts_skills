@@ -733,9 +733,9 @@ async def analyze_vulnerability_patterns_safe(url: str, forms: List[Dict]) -> Li
 ```python
 import sys
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Dict, Any
-sys.path.append(os.path.join(os.path.dirname(__file__), 'scripts'))
+sys.path.append(os.path.join(os.path.dirname(__file__), 'xlsx', 'scripts'))
 from excel_generator import ExcelReportGenerator
 
 def process_analysis_results(menu_analysis: List[Dict[str, Any]]) -> List[Dict[str, str]]:
@@ -934,6 +934,206 @@ def _get_enhanced_recommendation(vuln_type: str, severity: str, pattern: str) ->
     else:
         return f"[권장] {base_rec}"
 
+def create_markdown_report(data: List[Dict[str, str]], output_file: str, target_url: str, analysis_time: datetime) -> None:
+    """마크다운 보고서 생성 (한국 시간 기준)"""
+    try:
+        # 분석 시간을 한국 시간으로 포맷
+        report_date = analysis_time.strftime('%Y년 %m월 %d일 %H:%M:%S')
+
+        # 통계 계산
+        total_items = len(data)
+        severity_stats = {'HIGH': 0, 'MEDIUM': 0, 'LOW': 0}
+        vuln_types = {}
+        menu_stats = {}
+
+        for item in data:
+            severity = item.get('위험도', 'LOW')
+            severity_stats[severity] = severity_stats.get(severity, 0) + 1
+
+            vuln_type = item.get('취약점종류', '')
+            if vuln_type and vuln_type != '없음':
+                vuln_types[vuln_type] = vuln_types.get(vuln_type, 0) + 1
+
+            menu = item.get('메뉴', '')
+            menu_stats[menu] = menu_stats.get(menu, 0) + 1
+
+        # 마크다운 내용 생성
+        content = f"""# 웹사이트 보안 분석 보고서
+
+## 기본 정보
+
+| 항목 | 내용 |
+|------|------|
+| 분석 대상 | {target_url} |
+| 분석 일자 | {report_date} |
+| 총 분석 항목 | {total_items}개 |
+| 분석 방식 | Chrome DevTools + 패턴 분석 (공격 없음) |
+
+## 분석 결과 요약
+
+### 위험도별 분포
+
+| 위험도 | 개수 | 비율 |
+|--------|------|------|
+| 🔴 HIGH | {severity_stats.get('HIGH', 0)}개 | {severity_stats.get('HIGH', 0)/total_items*100:.1f}% |
+| 🟡 MEDIUM | {severity_stats.get('MEDIUM', 0)}개 | {severity_stats.get('MEDIUM', 0)/total_items*100:.1f}% |
+| 🟢 LOW | {severity_stats.get('LOW', 0)}개 | {severity_stats.get('LOW', 0)/total_items*100:.1f}% |
+
+### 취약점 종류별 분포
+
+"""
+
+        # 취약점 종류별 테이블 추가
+        if vuln_types:
+            content += "| 취약점 종류 | 개수 |\n|-------------|------|\n"
+            for vuln_type, count in sorted(vuln_types.items(), key=lambda x: x[1], reverse=True):
+                content += f"| {vuln_type} | {count}개 |\n"
+            content += "\n"
+
+        # 상세 분석 결과
+        content += "## 상세 분석 결과\n\n"
+
+        if not data:
+            content += "분석된 데이터가 없습니다.\n"
+        else:
+            # 위험도별 그룹화
+            high_items = [item for item in data if item.get('위험도') == 'HIGH']
+            medium_items = [item for item in data if item.get('위험도') == 'MEDIUM']
+            low_items = [item for item in data if item.get('위험도') == 'LOW']
+
+            # HIGH 위험도 항목
+            if high_items:
+                content += "### 🔴 HIGH 위험도 취약점\n\n"
+                for item in high_items:
+                    content += f"**{item.get('메뉴', '알 수 없음')}** - `{item.get('URL', '')}`\n\n"
+                    content += f"- **요소유형**: {item.get('요소유형', '')}\n"
+                    content += f"- **요소명**: {item.get('요소명', '')}\n"
+                    content += f"- **취약점종류**: {item.get('취약점종류', '')}\n"
+                    content += f"- **상세설명**: {item.get('상세설명', '')}\n"
+                    content += f"- **패턴**: `{item.get('패턴', '')}`\n"
+                    content += f"- **권장조치**: {item.get('권장조치', '')}\n\n"
+                    content += "---\n\n"
+
+            # MEDIUM 위험도 항목
+            if medium_items:
+                content += "### 🟡 MEDIUM 위험도 취약점\n\n"
+                for item in medium_items:
+                    content += f"**{item.get('메뉴', '알 수 없음')}** - `{item.get('URL', '')}`\n\n"
+                    content += f"- **요소유형**: {item.get('요소유형', '')}\n"
+                    content += f"- **요소명**: {item.get('요소명', '')}\n"
+                    content += f"- **취약점종류**: {item.get('취약점종류', '')}\n"
+                    content += f"- **상세설명**: {item.get('상세설명', '')}\n"
+                    content += f"- **패턴**: `{item.get('패턴', '')}`\n"
+                    content += f"- **권장조치**: {item.get('권장조치', '')}\n\n"
+                    content += "---\n\n"
+
+            # LOW 위험도 항목 (주요 내용만)
+            if low_items:
+                content += "### 🟢 LOW 위험도 및 일반 항목\n\n"
+                low_by_menu = {}
+                for item in low_items:
+                    menu = item.get('메뉴', '알 수 없음')
+                    if menu not in low_by_menu:
+                        low_by_menu[menu] = []
+                    low_by_menu[menu].append(item)
+
+                for menu, items in low_by_menu.items():
+                    content += f"**{menu}**\n\n"
+                    for item in items:
+                        vuln_type = item.get('취약점종류', '')
+                        element = item.get('요소명', '')
+                        description = item.get('상세설명', '')
+
+                        if vuln_type != '없음':
+                            content += f"- {vuln_type}: {description} ({element})\n"
+                        else:
+                            content += f"- 정상: {description}\n"
+                    content += "\n"
+
+        # 권장 조치 요약
+        content += """## 권장 조치 요약
+
+### 즉시 조치 필요 (HIGH 위험도)
+"""
+        if severity_stats.get('HIGH', 0) > 0:
+            high_items = [item for item in data if item.get('위험도') == 'HIGH']
+            unique_recommendations = set()
+            for item in high_items:
+                rec = item.get('권장조치', '')
+                if rec:
+                    unique_recommendations.add(rec)
+
+            for i, rec in enumerate(unique_recommendations, 1):
+                content += f"{i}. {rec}\n"
+        else:
+            content += "HIGH 위험도 취약점이 발견되지 않았습니다.\n"
+
+        content += """
+### 조속 조치 권장 (MEDIUM 위험도)
+"""
+        if severity_stats.get('MEDIUM', 0) > 0:
+            medium_items = [item for item in data if item.get('위험도') == 'MEDIUM']
+            unique_recommendations = set()
+            for item in medium_items:
+                rec = item.get('권장조치', '')
+                if rec:
+                    unique_recommendations.add(rec)
+
+            for i, rec in enumerate(unique_recommendations, 1):
+                content += f"{i}. {rec}\n"
+        else:
+            content += "MEDIUM 위험도 취약점이 발견되지 않았습니다.\n"
+
+        content += f"""
+## 분석 메타 정보
+
+- **분석 도구**: Chrome DevTools + 자동화 스크립트
+- **분석 방식**: 공격 없는 코드 패턴 분석
+- **분석 시각**: {report_date}
+- **총 분석 시간**: 자동 수집 및 분석
+- **보고서 생성**: 자동화된 보고서 생성 시스템
+
+## 중요 참고사항
+
+⚠️ **본 보고서는 자동화된 코드 패턴 분석을 기반으로 합니다.**
+- 실제 공격을 수행하지 않았으며, 발견된 패턴은 취약점 가능성을 나타냅니다.
+- 모든 HIGH 및 MEDIUM 위험도 항목은 보안 전문가의 추가 검토가 필요합니다.
+- 오탐(false positive) 가능성이 있으므로 수동 검증이 권장됩니다.
+- 정기적인 재분석을 통해 새로운 취약점 발생을 모니터링해야 합니다.
+
+---
+*보고서 생성 시간: {report_date}*
+"""
+
+        # 파일 저장 (UTF-8 인코딩)
+        with open(output_file, 'w', encoding='utf-8') as f:
+            f.write(content)
+
+    except Exception as e:
+        print(f"마크다운 보고서 생성 실패: {str(e)}")
+        # 오류 시 기본 보고서 생성
+        try:
+            error_content = f"""# 웹사이트 보안 분석 보고서 (오류)
+
+## 기본 정보
+
+- 분석 대상: {target_url}
+- 분석 일자: {report_date}
+- 상태: 보고서 생성 중 오류 발생
+
+## 오류 정보
+
+{str(e)}
+
+## 권장 조치
+
+시스템 관리자에게 문의하여 정상적인 보고서 생성을 확인하세요.
+"""
+            with open(output_file, 'w', encoding='utf-8') as f:
+                f.write(error_content)
+        except Exception as fallback_error:
+            print(f"오류 보고서 생성 실패: {str(fallback_error)}")
+
 # 엑셀 보고서 생성
 try:
     print("분석 결과를 처리합니다...")
@@ -941,13 +1141,20 @@ try:
     print(f"총 {len(processed_data)}개의 분석 항목을 생성했습니다.")
 
     # 엑셀 보고서 생성 (현재 작업 디렉토리에 생성)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    # 현재 한국 시간으로 날짜 생성
+    kst = datetime.now(timezone('Asia/Seoul'))
+    timestamp = kst.strftime("%Y%m%d_%H%M%S")
     output_file = os.path.join(os.getcwd(), f'website_security_analysis_{timestamp}.xlsx')
 
     generator = ExcelReportGenerator(processed_data)
     generator.create_detailed_report(output_file)
 
     print(f"엑셀 보고서 생성 완료: {output_file}")
+
+    # 마크다운 보고서 생성 (한국 시간 기준)
+    markdown_file = os.path.join(os.getcwd(), f'website_security_analysis_{timestamp}.md')
+    create_markdown_report(processed_data, markdown_file, target_url, kst)
+    print(f"마크다운 보고서 생성 완료: {markdown_file}")
 
 except Exception as e:
     print(f"보고서 생성 중 오류 발생: {str(e)}")

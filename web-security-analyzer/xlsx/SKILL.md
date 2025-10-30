@@ -4759,6 +4759,8 @@ from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any
 import pandas as pd
 import chardet
+import csv
+import io
 
 # Windows 인코딩 문제 해결
 if sys.platform == 'win32':
@@ -4769,8 +4771,181 @@ if sys.platform == 'win32':
     except:
         os.environ['PYTHONIOENCODING'] = 'utf-8'
 
-sys.path.append(os.path.join(os.path.dirname(__file__), 'xlsx', 'scripts'))
-from excel_generator import ExcelReportGenerator
+# 엑셀 라이브러리 임포트 (fallback 처리)
+try:
+    import openpyxl
+    from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
+    OPENPYXL_AVAILABLE = True
+except ImportError:
+    OPENPYXL_AVAILABLE = False
+    print("⚠️ openpyxl 라이브러리 없음 - CSV 형식으로만 보고서 생성")
+
+class SecurityReportGenerator:
+    """웹 보안 분석 결과 보고서 생성기 (한글 지원)"""
+
+    def __init__(self, analysis_data: List[Dict[str, Any]]):
+        self.analysis_data = analysis_data
+        self.kst = datetime.now() + timedelta(hours=9)
+
+    def create_csv_report(self, output_file: str = None) -> str:
+        """CSV 보고서 생성 (완벽한 한글 지원)"""
+        if output_file is None:
+            timestamp = self.kst.strftime("%Y%m%d_%H%M%S")
+            output_file = f"web_security_analysis_{timestamp}.csv"
+
+        # 컬럼 헤더 정의
+        headers = [
+            "메뉴", "URL", "요소유형", "요소명", "파라미터",
+            "HTTP메소드", "취약점종류", "위험도", "상세설명",
+            "패턴", "인증필요", "권장조치"
+        ]
+
+        try:
+            # UTF-8 BOM으로 CSV 파일 생성 (Excel 호환성 최대화)
+            with open(output_file, 'w', encoding='utf-8-sig', newline='') as csvfile:
+                writer = csv.writer(csvfile, quoting=csv.QUOTE_ALL)
+
+                # 헤더 작성
+                writer.writerow(headers)
+
+                # 데이터 작성
+                for row in self.analysis_data:
+                    row_data = []
+                    for header in headers:
+                        value = row.get(header, "")
+                        if value is None:
+                            value = ""
+                        # 한글 텍스트 정리
+                        if isinstance(value, str):
+                            value = str(value).strip()
+                        row_data.append(value)
+
+                    writer.writerow(row_data)
+
+            print(f"✅ CSV 보고서 생성 완료: {output_file}")
+            print(f"   • 데이터: {len(self.analysis_data)}개 항목")
+            print(f"   • 인코딩: UTF-8 BOM (Excel 완벽 호환)")
+
+            return output_file
+
+        except Exception as e:
+            print(f"❌ CSV 생성 실패: {str(e)}")
+            raise
+
+    def create_excel_report(self, output_file: str = None) -> str:
+        """엑셀 보고서 생성 (openpyxl 사용)"""
+        if not OPENPYXL_AVAILABLE:
+            print("⚠️ openpyxl 없음 - CSV로 대체 생성")
+            return self.create_csv_report(output_file.replace('.xlsx', '.csv') if output_file else None)
+
+        if output_file is None:
+            timestamp = self.kst.strftime("%Y%m%d_%H%M%S")
+            output_file = f"web_security_analysis_{timestamp}.xlsx"
+
+        try:
+            # 엑셀 워크북 생성
+            wb = openpyxl.Workbook()
+            ws = wb.active
+            ws.title = "보안 분석 결과"
+
+            # 컬럼 헤더
+            headers = [
+                "메뉴", "URL", "요소유형", "요소명", "파라미터",
+                "HTTP메소드", "취약점종류", "위험도", "상세설명",
+                "패턴", "인증필요", "권장조치"
+            ]
+
+            # 헤더 스타일
+            header_font = Font(bold=True, color="FFFFFF", name="맑은 고딕", size=11)
+            header_fill = PatternFill(start_color="366092", end_color="366092", fill_type="solid")
+            border = Border(
+                left=Side(style="thin"), right=Side(style="thin"),
+                top=Side(style="thin"), bottom=Side(style="thin")
+            )
+
+            # 헤더 작성
+            for col, header in enumerate(headers, 1):
+                cell = ws.cell(row=1, column=col, value=header)
+                cell.font = header_font
+                cell.fill = header_fill
+                cell.border = border
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+
+            # 데이터 작성
+            data_font = Font(name="맑은 고딕", size=10)
+
+            for row_idx, row_data in enumerate(self.analysis_data, 2):
+                for col, header in enumerate(headers, 1):
+                    value = row_data.get(header, "")
+                    if value is None:
+                        value = ""
+
+                    cell = ws.cell(row=row_idx, column=col, value=str(value))
+                    cell.font = data_font
+                    cell.border = border
+
+                    # 위험도별 색상
+                    if header == "위험도":
+                        if str(value).upper() == "HIGH":
+                            cell.fill = PatternFill(start_color="FFE6E6", end_color="FFE6E6", fill_type="solid")
+                        elif str(value).upper() == "MEDIUM":
+                            cell.fill = PatternFill(start_color="FFF4E6", end_color="FFF4E6", fill_type="solid")
+                        elif str(value).upper() == "LOW":
+                            cell.fill = PatternFill(start_color="E6F3FF", end_color="E6F3FF", fill_type="solid")
+
+                    # 정렬
+                    if header in ["메뉴", "요소유형", "취약점종류", "위험도", "인증필요"]:
+                        cell.alignment = Alignment(horizontal="center")
+                    elif header in ["상세설명", "권장조치"]:
+                        cell.alignment = Alignment(horizontal="left", vertical="top", wrap_text=True)
+
+            # 열 너비 조정
+            column_widths = [15, 40, 10, 30, 25, 12, 15, 10, 50, 25, 10, 30]
+            for col, width in enumerate(column_widths, 1):
+                ws.column_dimensions[openpyxl.utils.get_column_letter(col)].width = width
+
+            # 헤더 필터 및 고정
+            ws.auto_filter.ref = f"A1:L{len(self.analysis_data) + 1}"
+            ws.freeze_panes = "A2"
+
+            # 파일 저장
+            wb.save(output_file)
+            print(f"✅ 엑셀 보고서 생성 완료: {output_file}")
+            print(f"   • 데이터: {len(self.analysis_data)}개 항목")
+            print(f"   • 포맷: Excel (.xlsx)")
+
+            return output_file
+
+        except Exception as e:
+            print(f"❌ 엑셀 생성 실패: {str(e)}")
+            print("CSV 형식으로 대체 생성합니다...")
+            return self.create_csv_report(output_file.replace('.xlsx', '.csv') if output_file else None)
+
+    def create_summary_report(self) -> Dict[str, Any]:
+        """분석 결과 요약"""
+        total_items = len(self.analysis_data)
+        severity_counts = {"HIGH": 0, "MEDIUM": 0, "LOW": 0}
+        vulnerability_types = {}
+
+        for item in self.analysis_data:
+            severity = str(item.get("위험도", "")).upper()
+            if severity in severity_counts:
+                severity_counts[severity] += 1
+
+            vuln_type = item.get("취약점종류", "")
+            if vuln_type:
+                vulnerability_types[vuln_type] = vulnerability_types.get(vuln_type, 0) + 1
+
+        return {
+            "total_items": total_items,
+            "severity_distribution": severity_counts,
+            "vulnerability_types": vulnerability_types,
+            "analysis_time": self.kst.strftime("%Y-%m-%d %H:%M:%S"),
+            "high_risk_count": severity_counts["HIGH"],
+            "medium_risk_count": severity_counts["MEDIUM"],
+            "low_risk_count": severity_counts["LOW"],
+            "total_vulnerabilities": sum(severity_counts.values())
+        }
 
 def _generate_menu_name(menu_text: str, element_info: Dict[str, Any] = None) -> str:
     """클릭 대상 정보를 포함한 메뉴 이름 생성"""
@@ -5268,24 +5443,33 @@ def create_markdown_report(data: List[Dict[str, str]], output_file: str, target_
         except Exception as fallback_error:
             print(f"오류 보고서 생성 실패: {str(fallback_error)}")
 
-# 엑셀 보고서 생성
+# 보고서 생성 (새로운 방식)
 try:
     print("분석 결과를 처리합니다...")
     processed_data = process_analysis_results(menu_analysis)
     print(f"총 {len(processed_data)}개의 분석 항목을 생성했습니다.")
 
-    # 엑셀 보고서 생성 (현재 작업 디렉토리에 생성)
-    # 현재 한국 시간으로 날짜 생성
-    kst = datetime.now() + timedelta(hours=9)
-    timestamp = kst.strftime("%Y%m%d_%H%M%S")
-    output_file = os.path.join(os.getcwd(), f'website_security_analysis_{timestamp}.xlsx')
+    # 새로운 보고서 생성기 사용
+    generator = SecurityReportGenerator(processed_data)
 
-    generator = ExcelReportGenerator(processed_data)
-    generator.create_detailed_report(output_file)
+    # 엑셀 보고서 생성 (CSV fallback 포함)
+    excel_file = generator.create_excel_report()
 
-    print(f"엑셀 보고서 생성 완료: {output_file}")
+    # CSV 보고서도 함께 생성 (호환성)
+    csv_file = generator.create_csv_report()
+
+    # 분석 요약 출력
+    summary = generator.create_summary_report()
+    print(f"\n📊 분석 결과 요약:")
+    print(f"   • 전체 항목: {summary['total_items']}개")
+    print(f"   • HIGH 위험도: {summary['high_risk_count']}개")
+    print(f"   • MEDIUM 위험도: {summary['medium_risk_count']}개")
+    print(f"   • LOW 위험도: {summary['low_risk_count']}개")
+    print(f"   • 총 취약점: {summary['total_vulnerabilities']}개")
 
     # 마크다운 보고서 생성 (한국 시간 기준)
+    kst = datetime.now() + timedelta(hours=9)
+    timestamp = kst.strftime("%Y%m%d_%H%M%S")
     markdown_file = os.path.join(os.getcwd(), f'website_security_analysis_{timestamp}.md')
     create_markdown_report(processed_data, markdown_file, target_url, kst)
     print(f"마크다운 보고서 생성 완료: {markdown_file}")
@@ -5309,10 +5493,10 @@ except Exception as e:
             '권장조치': '시스템 관리자에게 문의'
         }]
 
-        output_file = os.path.join(os.getcwd(), f'website_security_analysis_error_{timestamp}.xlsx')
-        generator = ExcelReportGenerator(fallback_data)
-        generator.create_detailed_report(output_file)
-        print(f"오류 보고서 생성: {output_file}")
+        # 오류 시에도 새로운 생성기 사용
+        fallback_generator = SecurityReportGenerator(fallback_data)
+        fallback_csv = fallback_generator.create_csv_report()
+        print(f"오류 보고서 생성: {fallback_csv}")
 
     except Exception as fallback_error:
         print(f"오류 보고서 생성 실패: {str(fallback_error)}")
@@ -5387,8 +5571,8 @@ try:
 
     # 데이터 처리 후 엑셀 보고서 생성
     processed_data = process_analysis_results(df.to_dict('records'))
-    generator = ExcelReportGenerator(processed_data)
-    generator.create_detailed_report("security_report_from_csv.xlsx")
+    report_generator = SecurityReportGenerator(processed_data)
+    report_generator.create_excel_report("security_report_from_csv.xlsx")
 
 except FileNotFoundError:
     print(f"CSV 파일을 찾을 수 없습니다: {csv_file}")
@@ -5909,9 +6093,6 @@ try:
     try:
         print(f"\n📊 엑셀 보고서 생성 중...")
 
-        # 엑셀 생성기 가져오기
-        from scripts.excel_generator import ExcelReportGenerator
-
         # 분석 결과를 엑셀 형식으로 변환
         excel_data = []
 
@@ -5953,16 +6134,24 @@ try:
                     '권장조치': '정기적인 보안 점검 권장'
                 })
 
-        # 엑셀 보고서 생성
+        # 새로운 보고서 생성기 사용
         if excel_data:
-            generator = ExcelReportGenerator(excel_data)
-            output_file = generator.create_detailed_report()
-            print(f"✅ 엑셀 보고서 생성 완료: {output_file}")
+            generator = SecurityReportGenerator(excel_data)
+            excel_file = generator.create_excel_report()
+            csv_file = generator.create_csv_report()  # CSV도 함께 생성
+
+            # 요약 정보 출력
+            summary = generator.create_summary_report()
+            print(f"📊 보고서 요약:")
+            print(f"   • 총 항목: {summary['total_items']}개")
+            print(f"   • HIGH 위험도: {summary['high_risk_count']}개")
+            print(f"   • MEDIUM 위험도: {summary['medium_risk_count']}개")
+            print(f"   • LOW 위험도: {summary['low_risk_count']}개")
         else:
-            print("⚠️ 분석 결과가 없어 엑셀 보고서를 생성하지 않았습니다.")
+            print("⚠️ 분석 결과가 없어 보고서를 생성하지 않았습니다.")
 
     except Exception as excel_error:
-        print(f"⚠️ 엑셀 보고서 생성 실패: {str(excel_error)}")
+        print(f"⚠️ 보고서 생성 실패: {str(excel_error)}")
         print("분석 결과는 위에서 확인하실 수 있습니다.")
 
 except Exception as e:

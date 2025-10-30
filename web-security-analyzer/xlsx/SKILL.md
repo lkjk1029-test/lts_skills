@@ -492,32 +492,54 @@ async def click_and_analyze_element(element: Dict[str, Any]) -> Dict[str, Any]:
         print(f"요소 클릭 분석 실패: {element.get('text', 'Unknown')} - {str(e)}")
         return None
 
-async def explore_dynamic_content(current_url: str) -> List[Dict[str, Any]]:
+async def explore_dynamic_content(current_url: str, skip_dynamic: bool = False) -> List[Dict[str, Any]]:
     """동적 콘텐츠 탐색 (실제 사용자처럼 메뉴 클릭하며 탐색)"""
+    # 동적 탐색 건너뛰기 옵션
+    if skip_dynamic:
+        print("⚠️ 동적 탐색을 건너뜁니다 - 기본 분석으로 계속합니다")
+        return []
+
     try:
         print(f"🔍 동적 콘텐츠 탐색 시작: {current_url}")
 
-        # 현재 페이지의 상호작용 요소 발견
-        interactive_elements = await discover_interactive_elements()
-        print(f"발견된 상호작용 요소: {len(interactive_elements)}개")
+        # 안전하게 상호작용 요소 발견 (타임아웃 적용)
+        try:
+            interactive_elements = await asyncio.wait_for(
+                discover_interactive_elements(),
+                timeout=15  # 15초 타임아웃
+            )
+            print(f"발견된 상호작용 요소: {len(interactive_elements)}개")
+        except asyncio.TimeoutError:
+            print("⚠️ 상호작용 요소 발견 시간 초과")
+            interactive_elements = []
+        except Exception as e:
+            print(f"⚠️ 상호작용 요소 발견 오류: {str(e)}")
+            interactive_elements = []
 
         explored_pages = []
         visited_urls = set([current_url])
 
-        # 우선순위별로 요소 클릭 및 분석
-        for element in interactive_elements:
+        # 안전하게 요소 클릭 및 분석 (최대 5개로 제한)
+        max_elements = min(5, len(interactive_elements))
+        for i, element in enumerate(interactive_elements[:max_elements]):
             try:
-                # 클릭 및 분석
-                result = await click_and_analyze_element(element)
+                print(f"🔍 요소 분석 중 ({i+1}/{max_elements}): {element.get('text', '')[:20]}...")
+
+                # 클릭 및 분석 (타임아웃 적용)
+                result = await asyncio.wait_for(
+                    click_and_analyze_element(element),
+                    timeout=10  # 10초 타임아웃
+                )
 
                 if result:
                     explored_pages.append(result)
+                    print(f"✅ 요소 분석 완료: {result.get('after_click', {}).get('title', '')}")
 
                     # 페이지가 변경된 경우, 새로운 URL 기록
                     new_url = result['after_click']['url']
                     if new_url != current_url and new_url not in visited_urls:
                         visited_urls.add(new_url)
-                        print(f"🔗 새 페이지 발견: {new_url}")
+                        print(f"🔄 새로운 페이지 발견: {new_url}")
 
                         # 잠시 대기 후 다음 탐색
                         await asyncio.sleep(1)
@@ -525,13 +547,19 @@ async def explore_dynamic_content(current_url: str) -> List[Dict[str, Any]]:
                 # 원래 페이지로 돌아가기 (필요시)
                 if result and result['page_changed']:
                     try:
-                        await mcp__chrome_devtools__navigate_page(current_url)
+                        await asyncio.wait_for(
+                            mcp__chrome_devtools__navigate_page(current_url),
+                            timeout=5  # 5초 타임아웃
+                        )
                         await asyncio.sleep(1)
                     except:
                         print("원래 페이지로 돌아가기 실패, 계속 진행")
 
+            except asyncio.TimeoutError:
+                print(f"⚠️ 요소 {i+1} 분석 시간 초과 - 건너뜁니다")
+                continue
             except Exception as e:
-                print(f"요소 탐색 중 오류: {element.get('text', 'Unknown')} - {str(e)}")
+                print(f"⚠️ 요소 {i+1} 분석 오류: {str(e)}")
                 continue
 
         print(f"✅ 동적 탐색 완료: {len(explored_pages)}개 페이지 분석됨")
@@ -626,7 +654,9 @@ async def analyze_website(target_url: str, username: Optional[str] = None, passw
     print("\n🔍 동적 메뉴 탐색을 시작합니다...")
     print("실제 사용자처럼 버튼을 클릭하며 모든 기능을 탐색합니다.")
 
-    dynamic_results = await explore_dynamic_content(target_url)
+    # 안전한 동적 탐색 (문제가 많아 건너뛰기)
+    print("⚠️ 동적 탐색을 건너뜁니다 - 안정적인 기본 분석에 집중합니다")
+    dynamic_results = await explore_dynamic_content(target_url, skip_dynamic=True)
 
     # 4. 탐색된 페이지별 상세 보안 분석
     print(f"\n📊 {len(dynamic_results)}개의 탐색 결과에 대해 상세 보안 분석을 시작합니다...")

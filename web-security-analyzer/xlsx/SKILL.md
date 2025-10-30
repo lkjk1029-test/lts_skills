@@ -5793,6 +5793,142 @@ async def simulate_authentication_flows() -> Dict[str, Any]:
     except Exception as e:
         return {'error': str(e), 'auth_simulation_failed': True}
 
+# === 메인 실행 로직 ===
+
+# 사용자 입력 받기
+print("🎯 웹 보안 분석기 - AI 기반 종합 보안 기능 테스트")
+print("=" * 60)
+
+# 분석 대상 URL 및 인증 정보 설정
+target_url = "http://localhost:8888/"
+username = None  # Jupyter는 보통 username 없이 password만 사용
+password = "mypassword"
+
+print(f"🌐 분석 대상: {target_url}")
+print(f"🔐 비밀번호: {'*' * len(password) if password else '없음'}")
+
+# MCP 서버 설치 확인
+print("\n🔍 MCP 서버 설치 여부 확인 중...")
+mcp_status = check_mcp_servers()
+
+# 둘 다 설치되어 있지 않으면 종료
+if not all(mcp_status.values()):
+    print("\n" + "=" * 50)
+    print("❌ 스킬 실행 불가")
+    print("=" * 50)
+    print("두 MCP 서버 모두 설치가 필수입니다:")
+    print(f"  • Chrome DevTools MCP: {'✅' if mcp_status.get('chrome_devtools') else '❌'}")
+    print(f"  • Playwright MCP: {'✅' if mcp_status.get('playwright') else '❌'}")
+    print("\n설치 방법:")
+    print("  Claude Code 설정에서 두 MCP 서버를 모두 설치해주세요.")
+    print("  자세한 설명: https://docs.claude.com/claude-code/mcp")
+    print("=" * 50)
+    import sys
+    sys.exit(1)
+
+print("✅ MCP 서버 설치 확인 완료")
+print(f"   • Chrome DevTools MCP: {'✅' if mcp_status.get('chrome_devtools') else '❌'}")
+print(f"   • Playwright MCP: {'✅' if mcp_status.get('playwright') else '❌'}")
+
+# 설정 가져오기
+config = get_analysis_config()
+
+# Playwright 우선 사용 확인
+print(f"\n🚀 Playwright MCP를 사용하여 동적 메뉴 탐색을 시작합니다...")
+print(f"   • 타임아웃 설정: 전체 {config['total_timeout']}초, 요소별 {config['element_test_timeout']}초")
+print(f"   • 테스트 범위: 모든 상호작용 요소 ({'무제한' if config['max_elements'] is None else config['max_elements']}개)")
+
+# 분석 실행
+try:
+    import time
+    import asyncio
+
+    start_time = time.time()
+
+    # AI 기반 종합 보안 기능 테스트 실행
+    analysis_results = await analyze_website(
+        target_url=target_url,
+        username=username,
+        password=password,
+        config=config
+    )
+
+    elapsed_time = time.time() - start_time
+
+    # 최종 결과 요약
+    print(f"\n" + "=" * 60)
+    print(f"🎉 분석 완료 - AI 기반 종합 보안 기능 테스트")
+    print("=" * 60)
+    print(f"⏱️  소요 시간: {elapsed_time:.1f}초")
+    print(f"🎯 테스트된 요소: {analysis_results.get('total_elements_tested', 0)}개")
+    print(f"🔍 수행된 보안 테스트: {analysis_results.get('total_security_tests_performed', 0)}개")
+    print(f"🚨 발견된 취약점: {analysis_results.get('total_vulnerabilities_found', 0)}개")
+
+    # 엑셀 보고서 생성
+    try:
+        print(f"\n📊 엑셀 보고서 생성 중...")
+
+        # 엑셀 생성기 가져오기
+        from scripts.excel_generator import ExcelReportGenerator
+
+        # 분석 결과를 엑셀 형식으로 변환
+        excel_data = []
+
+        # 동적 보안 테스트 결과 변환
+        for test_result in analysis_results.get('dynamic_security_tests', []):
+            element = test_result.get('element', {})
+            vulnerabilities = test_result.get('vulnerabilities_found', [])
+
+            if vulnerabilities:
+                for vuln in vulnerabilities:
+                    excel_data.append({
+                        '메뉴': element.get('text', 'Unknown'),
+                        'URL': analysis_results.get('basic_info', {}).get('url', target_url),
+                        '요소유형': element.get('elementType', 'unknown'),
+                        '요소명': element.get('selector', ''),
+                        '파라미터': f"테스트 요소: {element.get('text', '')}",
+                        'HTTP메소드': 'N/A',
+                        '취약점종류': vuln.get('type', 'UNKNOWN'),
+                        '위험도': vuln.get('severity', 'LOW'),
+                        '상세설명': vuln.get('description', ''),
+                        '패턴': 'functional_test',
+                        '인증필요': 'Yes' if username or password else 'No',
+                        '권장조치': vuln.get('description', '상세한 보안 검토 필요')
+                    })
+            else:
+                # 취약점 없는 경우도 기록
+                excel_data.append({
+                    '메뉴': element.get('text', 'Unknown'),
+                    'URL': analysis_results.get('basic_info', {}).get('url', target_url),
+                    '요소유형': element.get('elementType', 'unknown'),
+                    '요소명': element.get('selector', ''),
+                    '파라미터': f"테스트 요소: {element.get('text', '')}",
+                    'HTTP메소드': 'N/A',
+                    '취약점종류': '없음',
+                    '위험도': 'LOW',
+                    '상세설명': '특별한 취약점 발견되지 않음',
+                    '패턴': 'functional_test',
+                    '인증필요': 'Yes' if username or password else 'No',
+                    '권장조치': '정기적인 보안 점검 권장'
+                })
+
+        # 엑셀 보고서 생성
+        if excel_data:
+            generator = ExcelReportGenerator(excel_data)
+            output_file = generator.create_detailed_report()
+            print(f"✅ 엑셀 보고서 생성 완료: {output_file}")
+        else:
+            print("⚠️ 분석 결과가 없어 엑셀 보고서를 생성하지 않았습니다.")
+
+    except Exception as excel_error:
+        print(f"⚠️ 엑셀 보고서 생성 실패: {str(excel_error)}")
+        print("분석 결과는 위에서 확인하실 수 있습니다.")
+
+except Exception as e:
+    print(f"❌ 분석 중 치명적 오류 발생: {str(e)}")
+    import traceback
+    print(f"상세 오류: {traceback.format_exc()}")
+
 ## 중요 사항
 
 - 이 스킬은 실제 공격을 수행하지 않고 코드 패턴 분석만 수행

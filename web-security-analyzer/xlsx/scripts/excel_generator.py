@@ -5,13 +5,26 @@
 웹 보안 분석 결과를 엑셀 파일로 생성
 """
 
+# Windows 콘솔 인코딩 설정
+import sys
+import os
+if sys.platform == 'win32':
+    try:
+        # 콘솔 UTF-8 모드 설정 (Windows 10+)
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
+    except:
+        # 대안: 환경변수 설정
+        os.environ['PYTHONIOENCODING'] = 'utf-8'
+
 import pandas as pd
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Border, Side, Alignment
 from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.chart import BarChart, Reference
 import json
-from datetime import datetime, timezone
+from datetime import datetime, timedelta
 import os
 from typing import Dict, List, Any
 
@@ -28,7 +41,7 @@ class ExcelReportGenerator:
 
         if output_filename is None:
             # 현재 한국 시간으로 날짜 생성
-            kst = datetime.now(timezone('Asia/Seoul'))
+            kst = datetime.now() + timedelta(hours=9)
             timestamp = kst.strftime("%Y%m%d_%H%M%S")
             output_filename = f"web_security_analysis_{timestamp}.xlsx"
 
@@ -234,7 +247,7 @@ class ExcelReportGenerator:
         if isinstance(self.analysis_results, list):
             # 새로운 형식의 데이터 처리
             # 현재 한국 시간으로 날짜 생성
-            kst = datetime.now(timezone('Asia/Seoul'))
+            kst = datetime.now() + timedelta(hours=9)
             summary_data = [
                 ["분석 대상", "웹사이트 전체"],
                 ["분석 시간", kst.strftime("%Y-%m-%d %H:%M:%S")],
@@ -261,7 +274,7 @@ class ExcelReportGenerator:
             security_info = self.analysis_results.get('security', {})
 
             # 현재 한국 시간으로 날짜 생성
-            kst = datetime.now(timezone('Asia/Seoul'))
+            kst = datetime.now() + timedelta(hours=9)
 
             summary_data = [
                 ["분석 대상 URL", basic_info.get('url', 'N/A')],

@@ -459,7 +459,7 @@ async def click_and_analyze_element(element: Dict[str, Any]) -> Dict[str, Any]:
         before_click = {
             url: original_url,
             title: await mcp__chrome_devtools__evaluate_script("() => document.title"),
-            timestamp: datetime.now(timezone('Asia/Seoul')).isoformat()
+            timestamp: datetime.now() + timedelta(hours=9).isoformat()
         }
 
         # 요소 클릭
@@ -472,7 +472,7 @@ async def click_and_analyze_element(element: Dict[str, Any]) -> Dict[str, Any]:
         after_click = {
             url: await mcp__chrome_devtools__evaluate_script("() => window.location.href"),
             title: await mcp__chrome_devtools__evaluate_script("() => document.title"),
-            timestamp: datetime.now(timezone('Asia/Seoul')).isoformat()
+            timestamp: datetime.now() + timedelta(hours=9).isoformat()
         }
 
         # 페이지 변경 감지
@@ -485,7 +485,7 @@ async def click_and_analyze_element(element: Dict[str, Any]) -> Dict[str, Any]:
             'after_click': after_click,
             'page_changed': page_changed,
             'analysis_type': 'click_interaction',
-            'timestamp': datetime.now(timezone('Asia/Seoul')).isoformat()
+            'timestamp': datetime.now() + timedelta(hours=9).isoformat()
         }
 
     except Exception as e:
@@ -809,7 +809,7 @@ except Exception as e:
 async def monitor_realtime_network(duration: int = 10) -> List[Dict[str, Any]]:
     """실시간 네트워크 요청 모니터링 (Playwright 활용)"""
     network_requests = []
-    start_time = datetime.now(timezone('Asia/Seoul'))
+    start_time = datetime.now() + timedelta(hours=9)
 
     print(f"🌐 실시간 네트워크 모니터링 시작 ({duration}초간)")
 
@@ -824,7 +824,7 @@ async def monitor_realtime_network(duration: int = 10) -> List[Dict[str, Any]]:
     except Exception as e:
         print(f"네트워크 모니터링 실패: {str(e)}")
 
-    end_time = datetime.now(timezone('Asia/Seoul'))
+    end_time = datetime.now() + timedelta(hours=9)
     monitoring_duration = (end_time - start_time).total_seconds()
 
     print(f"✅ 네트워크 모니터링 완료: {len(network_requests)}개 요청 ({monitoring_duration:.1f}초)")
@@ -988,7 +988,7 @@ async def monitor_with_chrome_devtools(duration: int) -> List[Dict[str, Any]]:
     try:
         print("Chrome DevTools로 네트워크 모니터링 시작...")
 
-        start_time = datetime.now(timezone('Asia/Seoul'))
+        start_time = datetime.now() + timedelta(hours=9)
 
         # 페이지 내에서 네트워크 활동 유도
         await mcp__chrome_devtools__evaluate_script("""
@@ -1123,7 +1123,7 @@ async def deep_api_analysis(api_endpoints: List[Dict[str, Any]], base_url: str) 
                 'parameter_analysis': parameter_analysis,
                 'auth_analysis': auth_analysis,
                 'rate_limit_analysis': rate_limit_analysis,
-                'deep_analysis_timestamp': datetime.now(timezone('Asia/Seoul')).isoformat(),
+                'deep_analysis_timestamp': datetime.now() + timedelta(hours=9).isoformat(),
                 'analysis_duration': 'parallel_completed'
             }
 
@@ -1132,7 +1132,7 @@ async def deep_api_analysis(api_endpoints: List[Dict[str, Any]], base_url: str) 
             return {
                 'original_api': api_info,
                 'error': str(e),
-                'deep_analysis_timestamp': datetime.now(timezone('Asia/Seoul')).isoformat()
+                'deep_analysis_timestamp': datetime.now() + timedelta(hours=9).isoformat()
             }
 
     # 세마포어로 동시성 제어
@@ -1144,7 +1144,7 @@ async def deep_api_analysis(api_endpoints: List[Dict[str, Any]], base_url: str) 
             return await analyze_single_api(api_info, index)
 
     # 모든 API 분석을 병렬로 시작
-    start_time = datetime.now(timezone('Asia/Seoul'))
+    start_time = datetime.now() + timedelta(hours=9)
 
     tasks = [
         analyze_with_semaphore(api_info, i)
@@ -1160,7 +1160,7 @@ async def deep_api_analysis(api_endpoints: List[Dict[str, Any]], base_url: str) 
         if not isinstance(result, Exception) and result is not None
     ]
 
-    end_time = datetime.now(timezone('Asia/Seoul'))
+    end_time = datetime.now() + timedelta(hours=9)
     duration = (end_time - start_time).total_seconds()
 
     print(f"✅ API 심층 분석 완료: {len(deep_analysis)}개 API 분석됨 (소요시간: {duration:.1f}초, 평균: {duration/max(len(deep_analysis),1):.1f}초/API)")
@@ -1453,7 +1453,7 @@ async def test_rate_limiting(url: str, method: str) -> Dict[str, Any]:
         # 빠른 연속 요청 테스트 (5번)
         for i in range(5):
             try:
-                start_time = datetime.now(timezone('Asia/Seoul'))
+                start_time = datetime.now() + timedelta(hours=9)
 
                 result = await mcp__chrome_devtools__evaluate_script(f"""
                 () => {{
@@ -1477,7 +1477,7 @@ async def test_rate_limiting(url: str, method: str) -> Dict[str, Any]:
                 """)
 
                 if result:
-                    end_time = datetime.now(timezone('Asia/Seoul'))
+                    end_time = datetime.now() + timedelta(hours=9)
                     rate_test_results.append({
                         'request_number': i + 1,
                         'status': result.get('status'),
@@ -2834,7 +2834,7 @@ async def analyze_page_security(url: str, menu_text: str, element_info: Dict[str
             'network_request_count': len(all_network_requests),
             'authentication_analysis': authentication_analysis,
             'api_deep_analysis': api_deep_analysis,
-            'analysis_timestamp': datetime.now(timezone('Asia/Seoul')).isoformat()
+            'analysis_timestamp': datetime.now() + timedelta(hours=9).isoformat()
         }
 
     except Exception as e:
@@ -3138,10 +3138,19 @@ async def analyze_vulnerability_patterns_safe(url: str, forms: List[Dict]) -> Li
 ```python
 import sys
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from typing import List, Dict, Any
 import pandas as pd
 import chardet
+
+# Windows 인코딩 문제 해결
+if sys.platform == 'win32':
+    try:
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        kernel32.SetConsoleMode(kernel32.GetStdHandle(-11), 7)
+    except:
+        os.environ['PYTHONIOENCODING'] = 'utf-8'
 
 sys.path.append(os.path.join(os.path.dirname(__file__), 'xlsx', 'scripts'))
 from excel_generator import ExcelReportGenerator
@@ -3621,7 +3630,7 @@ try:
 
     # 엑셀 보고서 생성 (현재 작업 디렉토리에 생성)
     # 현재 한국 시간으로 날짜 생성
-    kst = datetime.now(timezone('Asia/Seoul'))
+    kst = datetime.now() + timedelta(hours=9)
     timestamp = kst.strftime("%Y%m%d_%H%M%S")
     output_file = os.path.join(os.getcwd(), f'website_security_analysis_{timestamp}.xlsx')
 

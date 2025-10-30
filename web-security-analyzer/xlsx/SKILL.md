@@ -695,21 +695,111 @@ async def analyze_website(target_url: str, username: Optional[str] = None, passw
     print("\n🔍 동적 메뉴 탐색을 시작합니다...")
     print("실제 사용자처럼 버튼을 클릭하며 모든 기능을 탐색합니다.")
 
-    # Playwright로 동적 탐색 수행
-    print("🖱️ Playwright로 동적 메뉴 탐색을 시작합니다...")
-    print("실제 사용자처럼 버튼을 클릭하며 모든 기능을 탐색합니다.")
+    # Playwright로만 동적 메뉴 탐색 - Chrome DevTools는 여기서 사용 안 함
+    print("🖱️ Playwright로만 동적 메뉴 탐색 시작...")
+    print("Chrome DevTools 없이 Playwright만으로 버튼/링크 클릭하여 탐색합니다.")
 
+    dynamic_results = []
     try:
-        dynamic_results = await asyncio.wait_for(
-            explore_dynamic_content(target_url, skip_dynamic=False),
-            timeout=120  # 2분 타임아웃
-        )
-        print(f"✅ Playwright 동적 탐색 완료: {len(dynamic_results)}개 페이지 발견")
-    except asyncio.TimeoutError:
-        print("⚠️ 동적 탐색 시간 초과 - 기본 분석으로 계속합니다")
-        dynamic_results = []
+        # Playwright로 새 페이지 생성
+        page = await mcp__playwright__new_page(target_url)
+        await asyncio.sleep(3)  # 페이지 로딩 대기
+
+        # Playwright로 페이지 내 모든 클릭 가능 요소 찾기
+        clickable_elements = await mcp__playwright__evaluate_script("""
+        () => {
+            const elements = [];
+
+            // 버튼, 링크, 입력 필드 등 클릭 가능 요소 찾기
+            const selectors = [
+                'button:not([disabled])',
+                'a[href]:not([disabled])',
+                'input[type="button"]:not([disabled])',
+                'input[type="submit"]:not([disabled])',
+                '[role="button"]:not([disabled])',
+                '[onclick]:not([disabled])'
+            ];
+
+            selectors.forEach(selector => {
+                document.querySelectorAll(selector).forEach((el, index) => {
+                    const text = el.textContent?.trim() || el.value || el.title || '';
+                    if (text && text.length > 0 && text.length < 100) {
+                        elements.push({
+                            text: text,
+                            tagName: el.tagName,
+                            type: el.type || 'unknown',
+                            selector: selector,
+                            index: index,
+                            href: el.href || '',
+                            onclick: el.onclick ? 'has_onclick' : 'no_onclick'
+                        });
+                    }
+                });
+            });
+
+            return elements.slice(0, 10); // 최대 10개만
+        }
+        """)
+
+        print(f"🎯 Playwright 발견 요소: {len(clickable_elements)}개")
+
+        # 각 요소 클릭 및 분석
+        for i, element in enumerate(clickable_elements[:5]):  # 최대 5개 클릭
+            try:
+                print(f"🖱️ [{i+1}/5] Playwright 클릭: {element.get('text', '')}")
+
+                # 클릭 전 상태 저장
+                before_url = await mcp__playwright__evaluate_script("() => window.location.href")
+                before_title = await mcp__playwright__evaluate_script("() => document.title")
+
+                # Playwright로 클릭
+                if element.get('href'):
+                    await mcp__playwright__navigate_page(element.get('href'))
+                else:
+                    await mcp__playwright__click(element.get('selector', 'button'))
+
+                await asyncio.sleep(3)  # 페이지 변화 대기
+
+                # 클릭 후 상태 확인
+                after_url = await mcp__playwright__evaluate_script("() => window.location.href")
+                after_title = await mcp__playwright__evaluate_script("() => document.title")
+
+                page_changed = (before_url != after_url) or (before_title != after_title)
+
+                # 결과 저장
+                result = {
+                    'element': element,
+                    'before_click': {
+                        'url': before_url,
+                        'title': before_title,
+                        'timestamp': datetime.now() + timedelta(hours=9).isoformat()
+                    },
+                    'after_click': {
+                        'url': after_url,
+                        'title': after_title,
+                        'timestamp': datetime.now() + timedelta(hours=9).isoformat()
+                    },
+                    'page_changed': page_changed,
+                    'click_method': 'playwright_only',
+                    'timestamp': datetime.now() + timedelta(hours=9).isoformat()
+                }
+                dynamic_results.append(result)
+
+                print(f"✅ Playwright 클릭 완료: {'페이지 변경' if page_changed else '같은 페이지'}")
+
+                # 원래 페이지로 돌아가기 (페이지가 변경된 경우)
+                if page_changed:
+                    await mcp__playwright__navigate_page(target_url)
+                    await asyncio.sleep(2)
+
+            except Exception as e:
+                print(f"❌ Playwright 클릭 실패 {i+1}: {str(e)}")
+                continue
+
+        print(f"✅ Playwright 동적 탐색 완료: {len(dynamic_results)}개 페이지 탐색됨")
+
     except Exception as e:
-        print(f"⚠️ 동적 탐색 오류: {str(e)} - 기본 분석으로 계속합니다")
+        print(f"❌ Playwright 탐색 실패: {str(e)}")
         dynamic_results = []
 
     # 4. 탐색된 페이지별 상세 보안 분석

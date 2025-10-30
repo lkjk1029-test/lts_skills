@@ -432,7 +432,7 @@ async def discover_interactive_elements() -> List[Dict[str, Any]]:
         return []
 
 async def perform_comprehensive_security_test(element: Dict[str, Any]) -> Dict[str, Any]:
-    """요소에 대한 종합 보안 테스트 수행 (실제 기능 테스트)"""
+    """요소에 대한 종합 보안 테스트 수행 (Playwright + Chrome DevTools 혼합)"""
     try:
         element_type = element.get('elementType', 'unknown')
         element_text = element.get('text', 'Unknown')
@@ -450,12 +450,13 @@ async def perform_comprehensive_security_test(element: Dict[str, Any]) -> Dict[s
             'risks_identified': []
         }
 
-        # 1. 기본 상호작용 테스트
+        # 1. 기본 상호작용 테스트 (Playwright)
         interaction_result = await test_basic_interaction(element)
         if interaction_result:
             test_results['functionality_tests'].append(interaction_result)
 
-        # 2. 요소 유형별 특화 테스트
+        # 2. 요소 유형별 특화 테스트 (Chrome DevTools - 보안 분석)
+        # 동작 테스트는 Playwright로, 보안 분석은 Chrome DevTools로 분리
         if element_type == 'form':
             form_test_results = await test_form_security(element)
             test_results['security_tests'].extend(form_test_results)
@@ -469,7 +470,7 @@ async def perform_comprehensive_security_test(element: Dict[str, Any]) -> Dict[s
             input_test_results = await test_input_security(element)
             test_results['security_tests'].extend(input_test_results)
 
-        # 3. 공통 보안 테스트
+        # 3. 공통 보안 테스트 (Chrome DevTools)
         common_security_results = await test_common_vulnerabilities(element)
         test_results['security_tests'].extend(common_security_results)
 
@@ -500,7 +501,8 @@ async def test_basic_interaction(element: Dict[str, Any]) -> Dict[str, Any]:
         # Playwright 페이지 준비
         current_pages = await mcp__playwright__list_pages()
         if not current_pages:
-            original_url = await mcp__chrome_devtools__evaluate_script("() => window.location.href")
+            # Playwright로 현재 URL 가져오기
+            original_url = await mcp__playwright__evaluate_script("() => window.location.href")
             await mcp__playwright__new_page(original_url)
             await asyncio.sleep(2)
 

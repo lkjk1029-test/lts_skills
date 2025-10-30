@@ -1,11 +1,19 @@
 ---
 name: web-security-analyzer
-description: Comprehensive web security vulnerability analyzer that crawls entire websites, extracts menu structures, analyzes HTTP requests with parameters and methods, identifies potential vulnerabilities including XSS and SQL injection patterns, and generates detailed Excel reports with menu-by-menu security analysis.
+description: Playwright-based comprehensive web security vulnerability analyzer that performs real user interactions for dynamic analysis. Systematically analyzes entire websites through actual menu navigation, form interactions, and security testing, identifying vulnerabilities including XSS and SQL injection patterns with detailed Excel reporting.
 ---
 
-# 종합 웹 보안 분석기 스킬
+# 종합 웹 보안 분석기 스킬 (Playwright 우선 동적 분석)
 
-이 스킬은 Playwright로 메뉴를 직접 클릭하여 탐색하고 Chrome DevTools로 상세 보안 분석을 수행하여 웹사이트 전체를 체계적으로 분석한다. 모든 메뉴 구조와 보안 취약점을 식별하고 상세한 엑셀 보고서를 생성하며, 공격을 수행하지 않고 코드 패턴과 요청 분석을 통해 취약점 가능성을 평가한다.
+## ✶ Insight ─────────────────────────────
+이 분석은 동적 탐색(실제 클릭 및 상호작용)과 정적 분석(코드 패턴 검사)을 결합하여 웹 애플리케이션에서 발견될 수 있는 다양한 보안 취약점들을 식별합니다. XSS, SQL 인젝션, CSRF 등 일반적인 웹 보안 위협을 체계적으로 검사합니다.
+────────────────────────────────────────────────
+
+🎯 분석 시작...
+
+# 종합 웹 보안 분석기 스킬 (Playwright 우선 동적 분석)
+
+이 스킬은 **오직 Playwright MCP만 사용**하여 실제 사용자와 동일한 방식으로 웹사이트를 상호작용하며 동적 보안 분석을 수행한다. 모든 메뉴 클릭, 폼 제출, 페이지 탐색을 실제 브라우저 자동화로 처리하며, 동적 분석에서 Chrome DevTools는 절대 사용되지 않는다. 공격을 수행하지 않고 코드 패턴과 요청 분석을 통해 취약점 가능성을 평가하며 상세한 엑셀 보고서를 생성한다.
 
 ## 사용 시점
 
@@ -29,31 +37,31 @@ import importlib
 from typing import Dict, List, Any
 
 def check_mcp_servers() -> Dict[str, bool]:
-    """MCP 서버 설치 여부 확인"""
+    """MCP 서버 설치 여부 확인 (Playwright 우선)"""
     mcp_status = {
-        'chrome-devtools': False,
-        'playwright': False
+        'playwright': False,
+        'chrome-devtools': False
     }
 
     print("🔍 MCP 서버 설치 여부 확인 중...")
 
-    # Chrome DevTools MCP 확인
-    try:
-        # mcp__chrome_devtools__list_pages 같은 함수 호출로 확인
-        test_result = mcp__chrome_devtools__list_pages()
-        mcp_status['chrome-devtools'] = True
-        print("✅ Chrome DevTools MCP 설치됨")
-    except Exception as e:
-        print(f"❌ Chrome DevTools MCP 미설치 또는 오류: {str(e)}")
-
-    # Playwright MCP 확인
+    # Playwright MCP 확인 (우선)
     try:
         # mcp__playwright__new_page 같은 함수 호출로 확인
         test_result = mcp__playwright__new_page("about:blank")
         mcp_status['playwright'] = True
-        print("✅ Playwright MCP 설치됨")
+        print("✅ Playwright MCP 설치됨 (동적 분석 우선)")
     except Exception as e:
         print(f"❌ Playwright MCP 미설치 또는 오류: {str(e)}")
+
+    # Chrome DevTools MCP 확인 (선택사항)
+    try:
+        # mcp__chrome_devtools__list_pages 같은 함수 호출로 확인
+        test_result = mcp__chrome_devtools__list_pages()
+        mcp_status['chrome-devtools'] = True
+        print("✅ Chrome DevTools MCP 설치됨 (선택사항)")
+    except Exception as e:
+        print(f"❌ Chrome DevTools MCP 미설치 (선택사항): {str(e)}")
 
     return mcp_status
 
@@ -107,16 +115,15 @@ def validate_dependencies() -> bool:
     # 1. MCP 서버 확인
     mcp_status = check_mcp_servers()
 
-    # 둘 다 설치되어 있지 않으면 종료
-    if not all(mcp_status.values()):
+    # Playwright MCP 필수 확인 (동적 분석용)
+    if not mcp_status.get('playwright'):
         print("\n" + "=" * 50)
         print("❌ 스킬 실행 불가")
         print("=" * 50)
-        print("두 MCP 서버 모두 설치가 필수입니다:")
-        print("  • Chrome DevTools MCP (상세 분석 및 보안 점검)")
+        print("Playwright MCP 설치가 필수입니다 (동적 분석용):")
         print("  • Playwright MCP (메뉴 클릭 및 네비게이션)")
         print("\n설치 방법:")
-        print("  Claude Code 설정에서 두 MCP 서버를 모두 설치해주세요.")
+        print("  Claude Code 설정에서 Playwright MCP를 설치해주세요.")
         print("  자세한 설명: https://docs.claude.com/claude-code/mcp")
         print("=" * 50)
         return False
@@ -148,7 +155,7 @@ if not validate_dependencies():
 
 ### 3. 사이트 전체 탐색 및 크롤링
 
-Chrome DevTools를 사용하여 사이트 전체를 체계적으로 탐색한다. 에러 핸들링과 안정성을 최우선으로 고려한다:
+**Playwright MCP를 우선 사용**하여 실제 사용자 상호작용 방식으로 사이트 전체를 탐색한다. 에러 핸들링과 안정성을 최우선으로 고려한다:
 
 ```python
 import asyncio
@@ -178,10 +185,72 @@ async def safe_navigate(url: str, max_retries: int = RETRY_COUNT) -> bool:
             await asyncio.sleep(1)
     return False
 
-async def discover_interactive_elements() -> List[Dict[str, Any]]:
-    """동적 상호작용 가능한 요소 발견 (실제 사용자처럼)"""
+async def collect_basic_info_playwright(url: str) -> Dict[str, Any]:
+    """Playwright를 사용하여 기본 페이지 정보 수집"""
     try:
-        elements = await mcp__chrome_devtools__evaluate_script("""
+        basic_info = await playwright_evaluate_script("""
+        () => {
+            try {
+                return {
+                    title: document.title,
+                    url: window.location.href,
+                    domain: window.location.hostname,
+                    protocol: window.location.protocol,
+                    path: window.location.pathname,
+                    search: window.location.search,
+                    hash: window.location.hash,
+                    userAgent: navigator.userAgent,
+                    language: navigator.language,
+                    platform: navigator.platform,
+                    cookiesEnabled: navigator.cookieEnabled,
+                    onLine: navigator.onLine,
+                    screen: {
+                        width: screen.width,
+                        height: screen.height,
+                        availWidth: screen.availWidth,
+                        availHeight: screen.availHeight
+                    },
+                    window: {
+                        innerWidth: window.innerWidth,
+                        innerHeight: window.innerHeight,
+                        outerWidth: window.outerWidth,
+                        outerHeight: window.outerHeight
+                    },
+                    document: {
+                        readyState: document.readyState,
+                        referrer: document.referrer,
+                        lastModified: document.lastModified,
+                        domain: document.domain,
+                        cookie: document.cookie
+                    },
+                    performance: {
+                        timing: performance.timing ? {
+                            navigationStart: performance.timing.navigationStart,
+                            loadEventEnd: performance.timing.loadEventEnd,
+                            domContentLoaded: performance.timing.domContentLoadedEventEnd
+                        } : null
+                    }
+                };
+            } catch (e) {
+                console.error('Basic info collection error:', e.message);
+                return {
+                    error: e.message,
+                    url: window.location.href,
+                    title: document.title
+                };
+            }
+        }
+        """)
+
+        return basic_info or {}
+    except Exception as e:
+        print(f"기본 정보 수집 실패: {str(e)}")
+        return {}
+
+async def discover_interactive_elements() -> List[Dict[str, Any]]:
+    """동적 상호작용 가능한 요소 발견 (Playwright 사용, 실제 사용자처럼)"""
+    try:
+        elements = await playwright_evaluate_script("""
         () => {
             try {
                 const interactiveElements = [];
@@ -432,7 +501,7 @@ async def discover_interactive_elements() -> List[Dict[str, Any]]:
         return []
 
 async def perform_comprehensive_security_test(element: Dict[str, Any]) -> Dict[str, Any]:
-    """요소에 대한 종합 보안 테스트 수행 (Playwright + Chrome DevTools 혼합)"""
+    """요소에 대한 종합 보안 테스트 수행 (전체 Playwright 기반 동적 분석)"""
     try:
         element_type = element.get('elementType', 'unknown')
         element_text = element.get('text', 'Unknown')
@@ -455,8 +524,8 @@ async def perform_comprehensive_security_test(element: Dict[str, Any]) -> Dict[s
         if interaction_result:
             test_results['functionality_tests'].append(interaction_result)
 
-        # 2. 요소 유형별 특화 테스트 (Chrome DevTools - 보안 분석)
-        # 동작 테스트는 Playwright로, 보안 분석은 Chrome DevTools로 분리
+        # 2. 요소 유형별 특화 테스트 (Playwright - 통합 분석)
+        # 모든 테스트는 Playwright 기반으로 통합 실행
         if element_type == 'form':
             form_test_results = await test_form_security(element)
             test_results['security_tests'].extend(form_test_results)
@@ -470,7 +539,7 @@ async def perform_comprehensive_security_test(element: Dict[str, Any]) -> Dict[s
             input_test_results = await test_input_security(element)
             test_results['security_tests'].extend(input_test_results)
 
-        # 3. 공통 보안 테스트 (Chrome DevTools)
+        # 3. 공통 보안 테스트 (Playwright 기반 동적 분석)
         common_security_results = await test_common_vulnerabilities(element)
         test_results['security_tests'].extend(common_security_results)
 
@@ -725,12 +794,33 @@ async def test_common_vulnerabilities(element: Dict[str, Any]) -> List[Dict[str,
 
     return test_results
 
+# === Playwright 기반 보안 분석 래퍼 함수 ===
+
+async def playwright_evaluate_script(script: str, *args) -> Any:
+    """Playwright로 스크립트 실행 (모든 동적 분석의 전용 인터페이스)"""
+    try:
+        # Playwright 페이지 확인
+        pages = await mcp__playwright__list_pages()
+        if not pages:
+            print("❌ Playwright에 활성 페이지가 없습니다")
+            return None
+
+        page_id = pages[0].get('page_id')
+        if not page_id:
+            print("❌ 유효한 페이지 ID를 찾을 수 없습니다")
+            return None
+
+        return await mcp__playwright__evaluate_script(page_id, script, *args)
+    except Exception as e:
+        print(f"Playwright 스크립트 실행 실패: {str(e)}")
+        return None
+
 # === 구체적인 보안 테스트 함수들 ===
 
 async def analyze_form_structure(element: Dict[str, Any]) -> Dict[str, Any]:
-    """폼 구조 분석"""
+    """폼 구조 분석 (Playwright 사용)"""
     try:
-        form_analysis = await mcp__chrome_devtools__evaluate_script("""
+        form_analysis = await playwright_evaluate_script("""
         (selector) => {
             try {
                 const form = document.querySelector(selector) || document.querySelector('form');
@@ -819,7 +909,7 @@ async def test_input_validation(element: Dict[str, Any]) -> List[Dict[str, Any]]
 
         for payload in xss_payloads:
             try:
-                result = await mcp__chrome_devtools__evaluate_script(f"""
+                result = await playwright_evaluate_script(f"""
                 (payload) => {{
                     try {{
                         const inputs = document.querySelectorAll('input[type="text"], input[type="search"], textarea');
@@ -886,7 +976,7 @@ async def test_input_validation(element: Dict[str, Any]) -> List[Dict[str, Any]]
 async def test_csrf_protection(element: Dict[str, Any]) -> Dict[str, Any]:
     """CSRF 보호 확인"""
     try:
-        csrf_check = await mcp__chrome_devtools__evaluate_script("""
+        csrf_check = await playwright_evaluate_script("""
         () => {
             try {
                 const forms = document.querySelectorAll('form');
@@ -973,7 +1063,7 @@ async def test_sql_injection_form(element: Dict[str, Any]) -> List[Dict[str, Any
 
         for payload in safe_sqli_payloads:
             try:
-                result = await mcp__chrome_devtools__evaluate_script(f"""
+                result = await playwright_evaluate_script(f"""
                 (payload) => {{
                     try {{
                         const inputs = document.querySelectorAll('input[type="text"], input[type="search"], textarea');
@@ -1056,7 +1146,7 @@ async def test_xss_form(element: Dict[str, Any]) -> List[Dict[str, Any]]:
 
         for payload in xss_payloads:
             try:
-                result = await mcp__chrome_devtools__evaluate_script(f"""
+                result = await playwright_evaluate_script(f"""
                 (payload) => {{
                     try {{
                         const inputs = document.querySelectorAll('input[type="text"], textarea');
@@ -1141,7 +1231,7 @@ async def test_button_functionality(element: Dict[str, Any]) -> Dict[str, Any]:
                 })
 
         # onclick 핸들러 확인
-        onclick_check = await mcp__chrome_devtools__evaluate_script(f"""
+        onclick_check = await playwright_evaluate_script(f"""
         (text) => {{
             try {{
                 const buttons = Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"]'));
@@ -1232,7 +1322,7 @@ async def test_button_authentication(element: Dict[str, Any]) -> Dict[str, Any]:
     """버튼 인증 확인"""
     try:
         # 현재 페이지 인증 상태 확인
-        auth_check = await mcp__chrome_devtools__evaluate_script("""
+        auth_check = await playwright_evaluate_script("""
         () => {
             try {
                 // 로그인 상태 확인을 위한 다양한 지표
@@ -1285,7 +1375,7 @@ async def test_button_authentication(element: Dict[str, Any]) -> Dict[str, Any]:
 async def analyze_link_url(element: Dict[str, Any]) -> Dict[str, Any]:
     """링크 URL 분석"""
     try:
-        url_analysis = await mcp__chrome_devtools__evaluate_script(f"""
+        url_analysis = await playwright_evaluate_script(f"""
         (text) => {{
             try {{
                 const links = Array.from(document.querySelectorAll('a[href]'));
@@ -1357,7 +1447,7 @@ async def test_external_links(element: Dict[str, Any]) -> Dict[str, Any]:
         element_text = element.get('text', '').lower()
 
         # 외부 링크 확인
-        external_check = await mcp__chrome_devtools__evaluate_script(f"""
+        external_check = await playwright_evaluate_script(f"""
         (text) => {{
             try {{
                 const links = Array.from(document.querySelectorAll('a[href]'));
@@ -1417,7 +1507,7 @@ async def test_download_links(element: Dict[str, Any]) -> Dict[str, Any]:
         element_text = element.get('text', '').lower()
 
         # 다운로드 링크 확인
-        download_check = await mcp__chrome_devtools__evaluate_script(f"""
+        download_check = await playwright_evaluate_script(f"""
         (text) => {{
             try {{
                 const links = Array.from(document.querySelectorAll('a[href]'));
@@ -1474,7 +1564,7 @@ async def test_download_links(element: Dict[str, Any]) -> Dict[str, Any]:
 async def test_input_field_types(element: Dict[str, Any]) -> Dict[str, Any]:
     """입력 필드 유형 확인"""
     try:
-        field_analysis = await mcp__chrome_devtools__evaluate_script("""
+        field_analysis = await playwright_evaluate_script("""
         () => {
             try {
                 const inputs = document.querySelectorAll('input');
@@ -1532,7 +1622,7 @@ async def test_input_field_types(element: Dict[str, Any]) -> Dict[str, Any]:
 async def test_input_length_validation(element: Dict[str, Any]) -> Dict[str, Any]:
     """입력값 길이 검증 확인"""
     try:
-        length_validation = await mcp__chrome_devtools__evaluate_script("""
+        length_validation = await playwright_evaluate_script("""
         () => {
             try {
                 const inputs = document.querySelectorAll('input[type="text"], input[type="password"], textarea');
@@ -1599,7 +1689,7 @@ async def test_input_length_validation(element: Dict[str, Any]) -> Dict[str, Any
 async def test_sensitive_input_fields(element: Dict[str, Any]) -> Dict[str, Any]:
     """민감 정보 입력 필드 확인"""
     try:
-        sensitive_field_check = await mcp__chrome_devtools__evaluate_script("""
+        sensitive_field_check = await playwright_evaluate_script("""
         () => {
             try {
                 const sensitiveInputs = {
@@ -1662,7 +1752,7 @@ async def test_clickjacking_protection(element: Dict[str, Any]) -> Dict[str, Any
     """클릭재킹 방지 확인"""
     try:
         # X-Frame-Options 헤더 확인은 직접적으로 불가능하므로 간접 확인
-        frame_check = await mcp__chrome_devtools__evaluate_script("""
+        frame_check = await playwright_evaluate_script("""
         () => {
             try {
                 // 페이지가 iframe 내에 있는지 확인
@@ -1700,7 +1790,7 @@ async def test_clickjacking_protection(element: Dict[str, Any]) -> Dict[str, Any
 async def test_authentication_required(element: Dict[str, Any]) -> Dict[str, Any]:
     """인증 필요 여부 확인"""
     try:
-        auth_check = await mcp__chrome_devtools__evaluate_script("""
+        auth_check = await playwright_evaluate_script("""
         () => {
             try {
                 // 다양한 인증 지표 확인
@@ -1972,10 +2062,10 @@ def get_analysis_config() -> Dict[str, Any]:
     }
 
 async def safe_login(username: str, password: str) -> bool:
-    """안전한 로그인 처리"""
+    """안전한 로그인 처리 (Playwright 사용)"""
     try:
         # 로그인 폼 찾기
-        login_result = await mcp__chrome_devtools__evaluate_script("""
+        login_result = await playwright_evaluate_script("""
         () => {
             try {
                 const forms = document.querySelectorAll('form');
@@ -1987,9 +2077,9 @@ async def safe_login(username: str, password: str) -> bool:
 
                         return {
                             formAction: form.action || form.querySelector('button[type="submit"]')?.form?.action || '',
-                            passwordField: passwordField.name || passwordField.id,
-                            usernameField: usernameField?.name || usernameField?.id || '',
-                            submitButton: form.querySelector('button[type="submit"], input[type="submit"]')?.id || ''
+                            passwordSelector: 'input[type="password"], input[name*="password"], input[name*="pass"]',
+                            usernameSelector: usernameField ? 'input[type="text"], input[type="email"], input[name*="user"], input[name*="login"], input[name*="id"], input[name*="username"]' : '',
+                            submitSelector: 'button[type="submit"], input[type="submit"]'
                         };
                     }
                 }
@@ -2001,30 +2091,29 @@ async def safe_login(username: str, password: str) -> bool:
         }
         """)
 
-        if not login_result or not login_result.get('usernameField'):
+        if not login_result or not login_result.get('usernameSelector'):
             print("로그인 폼을 찾을 수 없습니다.")
             return False
 
-        # 로그인 정보 입력
-        await mcp__chrome_devtools__fill_form([
-            {"uid": login_result['usernameField'], "value": username},
-            {"uid": login_result['passwordField'], "value": password}
-        ])
+        # 사용자명 입력
+        await mcp__playwright__fill(login_result['usernameSelector'], username)
 
-        # 로그인 버튼 클릭
-        if login_result.get('submitButton'):
-            await mcp__chrome_devtools__click(login_result['submitButton'])
-        else:
-            # 엔터키 전송
-            await mcp__chrome_devtools__evaluate_script(f"""
-            () => {{
-                try {{
+        # 비밀번호 입력
+        await mcp__playwright__fill(login_result['passwordSelector'], password)
+
+        # 로그인 버튼 클릭 또는 엔터
+        try:
+            await mcp__playwright__click(login_result['submitSelector'])
+        except:
+            await playwright_evaluate_script("""
+            () => {
+                try {
                     const submitBtn = document.querySelector('button[type="submit"], input[type="submit"]');
                     if (submitBtn) submitBtn.click();
-                }} catch (e) {{
+                } catch (e) {
                     console.log('Submit error:', e.message);
-                }}
-            }}
+                }
+            }
             """)
 
         await asyncio.sleep(3)  # 로그인 처리 대기
@@ -2060,9 +2149,9 @@ async def analyze_website(target_url: str, username: Optional[str] = None, passw
         else:
             print("⚠️ 로그인에 실패했습니다. 비인증 상태로 분석을 계속합니다.")
 
-    # 3. 기본 정보 수집
+    # 3. 기본 정보 수집 (Playwright 사용)
     print("📊 기본 페이지 정보 수집 중...")
-    basic_info = await collect_basic_info(target_url)
+    basic_info = await collect_basic_info_playwright(target_url)
 
     # 4. AI 기반 종합 보안 기능 테스트
     print("\n🔍 AI 기반 동적 보안 테스트 시작...")
@@ -2116,8 +2205,8 @@ async def analyze_website(target_url: str, username: Optional[str] = None, passw
                 print(f"🖱️ [{i+1}/{len(elements_to_process)}] Playwright 클릭: {element.get('text', '')}")
 
                 # 클릭 전 상태 저장
-                before_url = await mcp__playwright__evaluate_script("() => window.location.href")
-                before_title = await mcp__playwright__evaluate_script("() => document.title")
+                before_url = await playwright_evaluate_script("() => window.location.href")
+                before_title = await playwright_evaluate_script("() => document.title")
 
                 # Playwright로 클릭
                 if element.get('href'):
@@ -2128,8 +2217,8 @@ async def analyze_website(target_url: str, username: Optional[str] = None, passw
                 await asyncio.sleep(config.get('click_timeout', 3))  # 설정 기반 클릭 후 대기
 
                 # 클릭 후 상태 확인
-                after_url = await mcp__playwright__evaluate_script("() => window.location.href")
-                after_title = await mcp__playwright__evaluate_script("() => document.title")
+                after_url = await playwright_evaluate_script("() => window.location.href")
+                after_title = await playwright_evaluate_script("() => document.title")
 
                 page_changed = (before_url != after_url) or (before_title != after_title)
 
@@ -2278,22 +2367,26 @@ async def analyze_website(target_url: str, username: Optional[str] = None, passw
 print("🔍 MCP 서버 설치 여부 확인 중...")
 mcp_status = check_mcp_servers()
 
-# 둘 다 설치되어 있지 않으면 종료
-if not all(mcp_status.values()):
+# Playwright MCP 필수 확인 (동적 분석용)
+if not mcp_status.get('playwright'):
     print("\n" + "=" * 50)
     print("❌ 스킬 실행 불가")
     print("=" * 50)
-    print("두 MCP 서버 모두 설치가 필수입니다:")
-    print("  • Chrome DevTools MCP (상세 분석 및 보안 점검)")
+    print("Playwright MCP 설치가 필수입니다 (동적 분석용):")
     print("  • Playwright MCP (메뉴 클릭 및 네비게이션)")
     print("\n설치 방법:")
-    print("  Claude Code 설정에서 두 MCP 서버를 모두 설치해주세요.")
+    print("  Claude Code 설정에서 Playwright MCP를 설치해주세요.")
     print("  자세한 설명: https://docs.claude.com/claude-code/mcp")
     print("=" * 50)
     import sys
     sys.exit(1)
 
 print("✅ MCP 서버 설치 확인 완료")
+print(f"   • Playwright MCP: {'✅'} (동적 분석 전용)")
+if mcp_status.get('chrome-devtools'):
+    print(f"   • Chrome DevTools MCP: {'✅'} (선택사항 - 네트워크 분석용)")
+else:
+    print(f"   • Chrome DevTools MCP: {'❌'} (선택사항)")
 
 # 설정 옵션
 config = {
@@ -2338,7 +2431,7 @@ async def monitor_realtime_network(duration: int = 10) -> List[Dict[str, Any]]:
         if await check_playwright_available():
             network_requests.extend(await monitor_with_playwright(duration))
         else:
-            # 2. Chrome DevTools로 대체
+            # 2. Chrome DevTools로 대체 (보조 네트워크 분석용)
             network_requests.extend(await monitor_with_chrome_devtools(duration))
 
     except Exception as e:
@@ -2502,16 +2595,16 @@ async def monitor_with_playwright(duration: int) -> List[Dict[str, Any]]:
     return requests
 
 async def monitor_with_chrome_devtools(duration: int) -> List[Dict[str, Any]]:
-    """Chrome DevTools로 네트워크 요청 모니터링"""
+    """Chrome DevTools로 보조 네트워크 요청 모니터링 (Playwright unavailable 시 fallback)"""
     requests = []
 
     try:
-        print("Chrome DevTools로 네트워크 모니터링 시작...")
+        print("Chrome DevTools로 보조 네트워크 모니터링 시작 (Playwright fallback)...")
 
         start_time = datetime.now() + timedelta(hours=9)
 
         # 페이지 내에서 네트워크 활동 유도
-        await mcp__chrome_devtools__evaluate_script("""
+        await playwright_evaluate_script("""
         () => {
             window.networkRequests = [];
 
@@ -2543,7 +2636,7 @@ async def monitor_with_chrome_devtools(duration: int) -> List[Dict[str, Any]]:
                 window.scrollTo(0, document.body.scrollHeight);
             }, 1000);
 
-            return 'Chrome DevTools 모니터링 설정 완료';
+            return 'Chrome DevTools 보조 모니터링 설정 완료';
         }
         """)
 
@@ -2551,7 +2644,7 @@ async def monitor_with_chrome_devtools(duration: int) -> List[Dict[str, Any]]:
         await asyncio.sleep(duration)
 
         # 네트워크 요청 수집
-        collected_requests = await mcp__chrome_devtools__evaluate_script("""
+        collected_requests = await playwright_evaluate_script("""
         () => {
             return window.networkRequests || [];
         }
@@ -2567,7 +2660,7 @@ async def monitor_with_chrome_devtools(duration: int) -> List[Dict[str, Any]]:
                     'monitoring_method': 'chrome_devtools'
                 })
 
-        # Chrome DevTools 네트워크 탭에서 수집된 요청도 가져오기
+        # 보조: Chrome DevTools 네트워크 분석 (Playwright 동적 분석 보완용)
         try:
             network_data = await mcp__chrome_devtools__list_network_requests(
                 pageSize=100,
@@ -2753,7 +2846,7 @@ async def analyze_api_structure(url: str, method: str) -> Dict[str, Any]:
     try:
         # 현재 페이지에서 API 호출 테스트
         if method in ['GET', 'HEAD', 'OPTIONS']:
-            test_result = await mcp__chrome_devtools__evaluate_script(f"""
+            test_result = await playwright_evaluate_script(f"""
             () => {{
                 try {{
                     const response = await fetch('{url}', {{
@@ -2838,7 +2931,7 @@ async def test_api_parameters(url: str, method: str) -> Dict[str, Any]:
                     test_url = f"{url}?{payload}" if method == 'GET' else url
 
                     try:
-                        test_result = await mcp__chrome_devtools__evaluate_script(f"""
+                        test_result = await playwright_evaluate_script(f"""
                         () => {{
                             try {{
                                 const response = await fetch('{test_url}', {{
@@ -2892,7 +2985,7 @@ async def test_authentication_bypass(url: str, method: str) -> Dict[str, Any]:
 
         # 1. 인증 없이 접근 테스트
         try:
-            unauthorized_result = await mcp__chrome_devtools__evaluate_script(f"""
+            unauthorized_result = await playwright_evaluate_script(f"""
             () => {{
                 try {{
                     const response = await fetch('{url}', {{
@@ -2932,7 +3025,7 @@ async def test_authentication_bypass(url: str, method: str) -> Dict[str, Any]:
 
         for headers in auth_headers:
             try:
-                header_test_result = await mcp__chrome_devtools__evaluate_script(f"""
+                header_test_result = await playwright_evaluate_script(f"""
                 () => {{
                     try {{
                         const response = await fetch('{url}', {{
@@ -2975,7 +3068,7 @@ async def test_rate_limiting(url: str, method: str) -> Dict[str, Any]:
             try:
                 start_time = datetime.now() + timedelta(hours=9)
 
-                result = await mcp__chrome_devtools__evaluate_script(f"""
+                result = await playwright_evaluate_script(f"""
                 () => {{
                     try {{
                         const response = await fetch('{url}', {{
@@ -3241,7 +3334,7 @@ async def analyze_cookie_security(target_url: str) -> Dict[str, Any]:
         }
 
         # 현재 페이지의 쿠키 분석 (SameSite 포함 고도화)
-        cookies_result = await mcp__chrome_devtools__evaluate_script(f"""
+        cookies_result = await playwright_evaluate_script(f"""
         () => {{
             // 현재 도메인의 쿠키 분석
             const cookies = document.cookie.split(';').map(c => c.trim()).filter(c => c);
@@ -3466,7 +3559,7 @@ async def analyze_session_management(target_url: str) -> Dict[str, Any]:
         }
 
         # 세션 토큰 패턴 분석
-        session_result = await mcp__chrome_devtools__evaluate_script(f"""
+        session_result = await playwright_evaluate_script(f"""
         () => {{
             // 로컬 스토리지 및 세션 스토리지 분석
             const storage = {{
@@ -3706,7 +3799,7 @@ async def analyze_authentication_mechanisms(target_url: str) -> Dict[str, Any]:
         }
 
         # 로그인 폼 및 인증 관련 요소 분석
-        auth_result = await mcp__chrome_devtools__evaluate_script(f"""
+        auth_result = await playwright_evaluate_script(f"""
         () => {{
             // 로그인 폼 검색
             const loginForms = [];
@@ -3840,7 +3933,7 @@ async def test_privilege_escalation(target_url: str) -> Dict[str, Any]:
         for admin_path in admin_paths:
             try:
                 admin_url = target_url.rstrip('/') + admin_path
-                result = await mcp__chrome_devtools__evaluate_script(f"""
+                result = await playwright_evaluate_script(f"""
                 () => {{
                     // 실제 관리자 페이지 접근은 보안상 위험할 수 있으므로,
                     // 단순히 링크 존재 여부만 확인
@@ -3875,7 +3968,7 @@ async def test_privilege_escalation(target_url: str) -> Dict[str, Any]:
                 continue
 
         # 역할 기반 접근 제어 테스트 (패턴 분석)
-        role_patterns = await mcp__chrome_devtools__evaluate_script(f"""
+        role_patterns = await playwright_evaluate_script(f"""
         () => {{
             // 역할 기반 접근 제어 패턴 검색
             const rolePatterns = [];
@@ -3961,7 +4054,7 @@ async def analyze_session_hijacking_risks(target_url: str) -> Dict[str, Any]:
         }
 
         # 세션 ID 예측 가능성 분석
-        predictability_result = await mcp__chrome_devtools__evaluate_script(f"""
+        predictability_result = await playwright_evaluate_script(f"""
         () => {{
             // 세션 관련 값 분석
             const sessionValues = [];
@@ -4055,7 +4148,7 @@ async def analyze_session_hijacking_risks(target_url: str) -> Dict[str, Any]:
                 })
 
         # 클라이언트 측 저장소 위험 분석
-        storage_result = await mcp__chrome_devtools__evaluate_script(f"""
+        storage_result = await playwright_evaluate_script(f"""
         () => {{
             const storageRisks = [];
 
@@ -4102,7 +4195,7 @@ async def analyze_session_hijacking_risks(target_url: str) -> Dict[str, Any]:
                 })
 
         # 네트워크 보안 분석 (HTTPS 여부 등)
-        current_protocol = await mcp__chrome_devtools__evaluate_script("() => window.location.protocol")
+        current_protocol = await playwright_evaluate_script("() => window.location.protocol")
         if current_protocol and current_protocol != 'https:':
             hijack_analysis['network_security'] = {
                 'protocol': current_protocol,
@@ -4136,7 +4229,7 @@ async def analyze_page_security(url: str, menu_text: str, element_info: Dict[str
     """안전한 페이지 보안 분석 (실시간 네트워크 포함)"""
     try:
         # 1. 페이지 상태 확인
-        page_status = await mcp__chrome_devtools__evaluate_script("""
+        page_status = await playwright_evaluate_script("""
         () => {
             try {
                 return {
@@ -4161,6 +4254,7 @@ async def analyze_page_security(url: str, menu_text: str, element_info: Dict[str
 
         # 3. 기존 네트워크 요청 수집
         try:
+            # 보조: Chrome DevTools 히스토리 네트워크 분석 (Playwright 동적 분석 보완용)
             historical_network = await mcp__chrome_devtools__list_network_requests(
                 pageSize=50, includePreservedRequests=True
             )
@@ -4177,7 +4271,7 @@ async def analyze_page_security(url: str, menu_text: str, element_info: Dict[str
         # 4. 폼 요소 분석
         forms = []
         try:
-            forms = await mcp__chrome_devtools__evaluate_script("""
+            forms = await playwright_evaluate_script("""
             () => {
                 try {
                     const forms = [];
@@ -4224,7 +4318,7 @@ async def analyze_page_security(url: str, menu_text: str, element_info: Dict[str
         # 5. 정적 API 엔드포인트 분석
         static_apis = []
         try:
-            static_apis = await mcp__chrome_devtools__evaluate_script("""
+            static_apis = await playwright_evaluate_script("""
             () => {
                 try {
                     const endpoints = [];
@@ -4289,7 +4383,7 @@ async def analyze_page_security(url: str, menu_text: str, element_info: Dict[str
         # 7. 보안 헤더 및 상태 분석
         security_headers = {}
         try:
-            security_headers = await mcp__chrome_devtools__evaluate_script("""
+            security_headers = await playwright_evaluate_script("""
             () => {
                 try {
                     return {
@@ -4370,7 +4464,7 @@ XSS, SQL Injection 등 다양한 취약점 패턴을 분석한다:
 async def analyze_vulnerability_patterns_safe(url: str, forms: List[Dict]) -> List[Dict[str, Any]]:
     """안전한 취약점 패턴 분석"""
     try:
-        vulnerabilities = await mcp__chrome_devtools__evaluate_script("""
+        vulnerabilities = await playwright_evaluate_script("""
         (forms) => {
             try {
                 const vulnerabilities = [];
@@ -5004,7 +5098,7 @@ def create_markdown_report(data: List[Dict[str, str]], output_file: str, target_
 | 분석 대상 | {target_url} |
 | 분석 일자 | {report_date} |
 | 총 분석 항목 | {total_items}개 |
-| 분석 방식 | Playwright + Chrome DevTools (공격 없음) |
+| 분석 방식 | Playwright (공격 없음, 실제 사용자 상호작용) |
 
 ## 분석 결과 요약
 
@@ -5124,7 +5218,7 @@ def create_markdown_report(data: List[Dict[str, str]], output_file: str, target_
         content += f"""
 ## 분석 메타 정보
 
-- **분석 도구**: Playwright + Chrome DevTools
+- **분석 도구**: Playwright (전용 동적 분석)
 - **분석 방식**: 공격 없는 코드 패턴 분석
 - **분석 시각**: {report_date}
 - **총 분석 시간**: 자동 수집 및 분석
@@ -5268,9 +5362,9 @@ except Exception as e:
 ## 실행 완료 조건
 
 다음 조건들이 모두 충족되어야 분석이 완료된다:
-- 사이트의 모든 내비게이션 메뉴 탐색 완료
-- 각 페이지의 모든 폼과 API 엔드포인트 분석 완료
-- 모든 취약점 패턴 분석 완료
+- **Playwright 기반** 사이트의 모든 내비게이션 메뉴 실제 클릭 탐색 완료
+- 각 페이지의 모든 폼과 상호작용 요소 **실제 사용자 테스트** 완료
+- 모든 취약점 패턴 **동적 분석 기반** 분석 완료
 - 엑셀 보고서 생성 완료
 - 분석 결과 요약 보고 제공
 
@@ -5437,7 +5531,7 @@ async def simulate_user_interactions(target_url: str) -> Dict[str, Any]:
 async def simulate_form_interactions() -> Dict[str, Any]:
     """폼 상호작용 시뮬레이션"""
     try:
-        form_simulation = await mcp__chrome_devtools__evaluate_script("""
+        form_simulation = await playwright_evaluate_script("""
         () => {
             const forms = document.querySelectorAll('form');
             const results = [];
@@ -5515,7 +5609,7 @@ async def simulate_form_interactions() -> Dict[str, Any]:
 async def simulate_ajax_event_triggers() -> Dict[str, Any]:
     """AJAX 이벤트 트리거 시뮬레이션"""
     try:
-        ajax_simulation = await mcp__chrome_devtools__evaluate_script("""
+        ajax_simulation = await playwright_evaluate_script("""
         () => {
             const results = [];
             const vulnerabilities = [];
@@ -5587,7 +5681,7 @@ async def simulate_ajax_event_triggers() -> Dict[str, Any]:
 async def simulate_navigation_patterns() -> Dict[str, Any]:
     """네비게이션 패턴 시뮬레이션"""
     try:
-        nav_simulation = await mcp__chrome_devtools__evaluate_script("""
+        nav_simulation = await playwright_evaluate_script("""
         () => {
             const results = [];
             const vulnerabilities = [];
@@ -5652,7 +5746,7 @@ async def simulate_navigation_patterns() -> Dict[str, Any]:
 async def simulate_authentication_flows() -> Dict[str, Any]:
     """인증 흐름 시뮬레이션"""
     try:
-        auth_simulation = await mcp__chrome_devtools__evaluate_script("""
+        auth_simulation = await playwright_evaluate_script("""
         () => {
             const results = {
                 loginForms: [],
@@ -5753,32 +5847,35 @@ print(f"🔐 비밀번호: {'*' * len(password) if password else '없음'}")
 print("\n🔍 MCP 서버 설치 여부 확인 중...")
 mcp_status = check_mcp_servers()
 
-# 둘 다 설치되어 있지 않으면 종료
-if not all(mcp_status.values()):
+# Playwright MCP 필수 확인 (동적 분석용)
+if not mcp_status.get('playwright'):
     print("\n" + "=" * 50)
     print("❌ 스킬 실행 불가")
     print("=" * 50)
-    print("두 MCP 서버 모두 설치가 필수입니다:")
-    print(f"  • Chrome DevTools MCP: {'✅' if mcp_status.get('chrome_devtools') else '❌'}")
-    print(f"  • Playwright MCP: {'✅' if mcp_status.get('playwright') else '❌'}")
+    print("Playwright MCP 설치가 필수입니다 (동적 분석용):")
+    print(f"  • Playwright MCP: {'❌'}")
     print("\n설치 방법:")
-    print("  Claude Code 설정에서 두 MCP 서버를 모두 설치해주세요.")
+    print("  Claude Code 설정에서 Playwright MCP를 설치해주세요.")
     print("  자세한 설명: https://docs.claude.com/claude-code/mcp")
     print("=" * 50)
     import sys
     sys.exit(1)
 
 print("✅ MCP 서버 설치 확인 완료")
-print(f"   • Chrome DevTools MCP: {'✅' if mcp_status.get('chrome_devtools') else '❌'}")
-print(f"   • Playwright MCP: {'✅' if mcp_status.get('playwright') else '❌'}")
+print(f"   • Playwright MCP: {'✅' if mcp_status.get('playwright') else '❌'} (동적 분석 전용)")
+if mcp_status.get('chrome-devtools'):
+    print(f"   • Chrome DevTools MCP: {'✅'} (선택사항 - 네트워크 분석용)")
+else:
+    print(f"   • Chrome DevTools MCP: {'❌'} (선택사항)")
 
 # 설정 가져오기
 config = get_analysis_config()
 
-# Playwright 우선 사용 확인
-print(f"\n🚀 Playwright MCP를 사용하여 동적 메뉴 탐색을 시작합니다...")
-print(f"   • 타임아웃 설정: 전체 {config['total_timeout']}초, 요소별 {config['element_test_timeout']}초")
-print(f"   • 테스트 범위: 모든 상호작용 요소 ({'무제한' if config['max_elements'] is None else config['max_elements']}개)")
+# Playwright 기반 동적 보안 분석 시작
+print(f"\n🚀 Playwright 기반 동적 보안 분석 시작...")
+print(f"   • 타겟: {target_url}")
+print(f"   • 타임아웃: 전체 {config['total_timeout']}초")
+print(f"   • 분석 방식: 실제 사용자 상호작용 기반 보안 테스트")
 
 # 분석 실행
 try:
@@ -5798,13 +5895,12 @@ try:
     elapsed_time = time.time() - start_time
 
     # 최종 결과 요약
-    print(f"\n" + "=" * 60)
-    print(f"🎉 분석 완료 - AI 기반 종합 보안 기능 테스트")
-    print("=" * 60)
+    print(f"\n" + "=" * 50)
+    print(f"🎉 Playwright 기반 동적 보안 분석 완료")
+    print("=" * 50)
     print(f"⏱️  소요 시간: {elapsed_time:.1f}초")
-    print(f"🎯 테스트된 요소: {analysis_results.get('total_elements_tested', 0)}개")
-    print(f"🔍 수행된 보안 테스트: {analysis_results.get('total_security_tests_performed', 0)}개")
-    print(f"🚨 발견된 취약점: {analysis_results.get('total_vulnerabilities_found', 0)}개")
+    print(f"🎯 테스트 요소: {analysis_results.get('total_elements_tested', 0)}개")
+    print(f"🚨 취약점 발견: {analysis_results.get('total_vulnerabilities_found', 0)}개")
 
     # 엑셀 보고서 생성
     try:
@@ -5874,7 +5970,7 @@ except Exception as e:
 ## 중요 사항
 
 - 이 스킬은 실제 공격을 수행하지 않고 코드 패턴 분석만 수행
-- 모든 분석은 Chrome DevTools를 통한 안전한 방식으로 진행
+- 모든 분석은 Playwright를 통한 실제 사용자 상호작용 방식으로 진행
 - 결과는 취약점 가능성을 나타내며, 전문가의 추가 검토 필요
 - 분석 대상 사이트의 약관과 robots.txt 준수 필수
 - CSV 파일 처리 시 인코딩 문제를 자동으로 해결하며, 한글(UTF-8, CP949, EUC-KR) 인코딩을 지원

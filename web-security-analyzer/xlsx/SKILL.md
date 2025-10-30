@@ -695,9 +695,22 @@ async def analyze_website(target_url: str, username: Optional[str] = None, passw
     print("\n🔍 동적 메뉴 탐색을 시작합니다...")
     print("실제 사용자처럼 버튼을 클릭하며 모든 기능을 탐색합니다.")
 
-    # 안전한 동적 탐색 (문제가 많아 건너뛰기)
-    print("⚠️ 동적 탐색을 건너뜁니다 - 안정적인 기본 분석에 집중합니다")
-    dynamic_results = await explore_dynamic_content(target_url, skip_dynamic=True)
+    # Playwright로 동적 탐색 수행
+    print("🖱️ Playwright로 동적 메뉴 탐색을 시작합니다...")
+    print("실제 사용자처럼 버튼을 클릭하며 모든 기능을 탐색합니다.")
+
+    try:
+        dynamic_results = await asyncio.wait_for(
+            explore_dynamic_content(target_url, skip_dynamic=False),
+            timeout=120  # 2분 타임아웃
+        )
+        print(f"✅ Playwright 동적 탐색 완료: {len(dynamic_results)}개 페이지 발견")
+    except asyncio.TimeoutError:
+        print("⚠️ 동적 탐색 시간 초과 - 기본 분석으로 계속합니다")
+        dynamic_results = []
+    except Exception as e:
+        print(f"⚠️ 동적 탐색 오류: {str(e)} - 기본 분석으로 계속합니다")
+        dynamic_results = []
 
     # 4. 탐색된 페이지별 상세 보안 분석
     print(f"\n📊 {len(dynamic_results)}개의 탐색 결과에 대해 상세 보안 분석을 시작합니다...")
@@ -831,6 +844,27 @@ async def collect_static_links_fallback() -> List[Dict[str, str]]:
     except Exception as e:
         print(f"정적 링크 수집 실패: {str(e)}")
         return []
+
+# MCP 서버 설치 확인
+print("🔍 MCP 서버 설치 여부 확인 중...")
+mcp_status = check_mcp_servers()
+
+# 둘 다 설치되어 있지 않으면 종료
+if not all(mcp_status.values()):
+    print("\n" + "=" * 50)
+    print("❌ 스킬 실행 불가")
+    print("=" * 50)
+    print("두 MCP 서버 모두 설치가 필수입니다:")
+    print("  • Chrome DevTools MCP (상세 분석 및 보안 점검)")
+    print("  • Playwright MCP (메뉴 클릭 및 네비게이션)")
+    print("\n설치 방법:")
+    print("  Claude Code 설정에서 두 MCP 서버를 모두 설치해주세요.")
+    print("  자세한 설명: https://docs.claude.com/claude-code/mcp")
+    print("=" * 50)
+    import sys
+    sys.exit(1)
+
+print("✅ MCP 서버 설치 확인 완료")
 
 # 실행
 try:

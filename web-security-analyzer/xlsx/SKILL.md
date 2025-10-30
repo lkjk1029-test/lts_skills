@@ -160,13 +160,17 @@ PAGE_TIMEOUT = 10000  # 페이지 로딩 타임아웃 (ms)
 RETRY_COUNT = 3  # 실패 시 재시도 횟수
 
 async def safe_navigate(url: str, max_retries: int = RETRY_COUNT) -> bool:
-    """안전한 페이지 네비게이션"""
+    """안전한 페이지 네비게이션 (Playwright 사용)"""
     for attempt in range(max_retries):
         try:
-            await mcp__chrome_devtools__navigate_page(url)
-            # 페이지 로딩 대기
-            await asyncio.sleep(2)
-            return True
+            # Playwright로 페이지 열기
+            page_result = await mcp__playwright__new_page(url)
+            if page_result:
+                # 페이지 로딩 대기
+                await asyncio.sleep(2)
+                return True
+            else:
+                raise Exception("Failed to create new page")
         except Exception as e:
             print(f"페이지 로딩 실패 (시도 {attempt + 1}/{max_retries}): {url} - {str(e)}")
             if attempt == max_retries - 1:

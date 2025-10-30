@@ -2267,52 +2267,6 @@ async def analyze_website(target_url: str, username: Optional[str] = None, passw
 
     return menu_analysis
 
-async def collect_static_links_fallback() -> List[Dict[str, str]]:
-    """동적 탐색으로 발견되지 않은 정적 링크 수집 (보조 기능)"""
-    try:
-        links = await mcp__chrome_devtools__evaluate_script("""
-        () => {
-            try {
-                const links = [];
-                const visitedUrls = new Set();
-
-                // 일반 내부 링크만 수집 (동적 탐색으로 발견되지 않은 것들)
-                const internalLinks = document.querySelectorAll('a[href]');
-                let linkCount = 0;
-
-                internalLinks.forEach(link => {
-                    if (linkCount >= 30) return;
-
-                    if (link.href &&
-                        link.href.includes(window.location.origin) &&
-                        !link.href.includes('#') &&
-                        !link.href.includes('javascript:') &&
-                        !visitedUrls.has(link.href) &&
-                        linkCount < 30) {
-
-                        visitedUrls.add(link.href);
-                        links.push({
-                            text: link.textContent.trim(),
-                            url: link.href,
-                            type: 'static_fallback',
-                            priority: 5
-                        });
-                        linkCount++;
-                    }
-                });
-
-                return links;
-            } catch (e) {
-                console.error('Static links collection error:', e.message);
-                return [];
-            }
-        }
-        """)
-
-        return links or []
-    except Exception as e:
-        print(f"정적 링크 수집 실패: {str(e)}")
-        return []
 
 # MCP 서버 설치 확인
 print("🔍 MCP 서버 설치 여부 확인 중...")
@@ -4814,24 +4768,6 @@ def safe_read_csv(file_path: str) -> pd.DataFrame:
 
     raise Exception(f"CSV 파일을 어떤 인코딩으로도 읽을 수 없습니다: {file_path}")
 
-# CSV 파일 읽기 예시 (필요시 사용)
-# def load_csv_data(csv_file_path: str) -> pd.DataFrame:
-#     """CSV 파일을 안전하게 읽어서 분석 데이터로 변환"""
-#     try:
-#         df = safe_read_csv(csv_file_path)
-#
-#         # 필요한 컬럼이 있는지 확인
-#         required_columns = ['menu', 'url', 'vulnerability_type', 'severity']
-#         missing_columns = [col for col in required_columns if col not in df.columns]
-#
-#         if missing_columns:
-#             print(f"경고: 필요한 컬럼이 없습니다: {missing_columns}")
-#             print(f"사용 가능한 컬럼: {list(df.columns)}")
-#
-#         return df
-#     except Exception as e:
-#         print(f"CSV 파일 로드 실패: {str(e)}")
-#         return pd.DataFrame()
 
 def process_analysis_results(menu_analysis: List[Dict[str, Any]]) -> List[Dict[str, str]]:
     """분석 결과를 전처리하고 중복을 제거"""

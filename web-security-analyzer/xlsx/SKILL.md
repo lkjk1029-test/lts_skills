@@ -674,7 +674,7 @@ async def safe_login(username: str, password: str) -> bool:
         return False
 
 # 메인 분석 프로세스 (동적 탐색 기반)
-async def analyze_website(target_url: str, username: Optional[str] = None, password: Optional[str] = None):
+async def analyze_website(target_url: str, username: Optional[str] = None, password: Optional[str] = None, config: Dict[str, Any] = None):
     """웹사이트 분석 메인 함수 (실제 사용자처럼 클릭하며 탐색)"""
 
     print("=" * 60)
@@ -700,10 +700,11 @@ async def analyze_website(target_url: str, username: Optional[str] = None, passw
     print("Chrome DevTools 없이 Playwright만으로 버튼/링크 클릭하여 탐색합니다.")
 
     dynamic_results = []
+    start_time = time.time()  # 타임아웃 추적 시작
     try:
         # Playwright로 새 페이지 생성
         page = await mcp__playwright__new_page(target_url)
-        await asyncio.sleep(3)  # 페이지 로딩 대기
+        await asyncio.sleep(config.get('page_load_timeout', 3))  # 설정 기반 페이지 로딩 대기
 
         # Playwright로 페이지 내 모든 클릭 가능 요소 찾기
         clickable_elements = await mcp__playwright__evaluate_script("""
@@ -737,16 +738,30 @@ async def analyze_website(target_url: str, username: Optional[str] = None, passw
                 });
             });
 
-            return elements.slice(0, 10); // 최대 10개만
+            return elements; // 모든 요소 반환
         }
         """)
 
         print(f"🎯 Playwright 발견 요소: {len(clickable_elements)}개")
 
-        # 각 요소 클릭 및 분석 (모든 요소 클릭)
-        for i, element in enumerate(clickable_elements):
+        # 최대 요소 수 제한 적용
+        elements_to_process = clickable_elements
+        if config.get('max_elements') is not None:
+            elements_to_process = clickable_elements[:config['max_elements')]
+            print(f"⚙️ 설정된 최대 요소 수: {config['max_elements']}개 (총 {len(clickable_elements)}개 중)")
+
+        # 실패한 요소 추적용 리스트
+        failed_elements = []
+
+        # 각 요소 클릭 및 분석
+        for i, element in enumerate(elements_to_process):
             try:
-                print(f"🖱️ [{i+1}/{len(clickable_elements)}] Playwright 클릭: {element.get('text', '')}")
+                # 타임아웃 체크
+                if time.time() - start_time > config.get('total_timeout', 300):
+                    print(f"⏰️ 전체 타임아웃 도달 - 남은 {len(elements_to_process)-i}개 요소 건너뜀")
+                    break
+
+                print(f"🖱️ [{i+1}/{len(elements_to_process)}] Playwright 클릭: {element.get('text', '')}")
 
                 # 클릭 전 상태 저장
                 before_url = await mcp__playwright__evaluate_script("() => window.location.href")
@@ -758,7 +773,7 @@ async def analyze_website(target_url: str, username: Optional[str] = None, passw
                 else:
                     await mcp__playwright__click(element.get('selector', 'button'))
 
-                await asyncio.sleep(3)  # 페이지 변화 대기
+                await asyncio.sleep(config.get('click_timeout', 3))  # 설정 기반 클릭 후 대기
 
                 # 클릭 후 상태 확인
                 after_url = await mcp__playwright__evaluate_script("() => window.location.href")
@@ -790,16 +805,34 @@ async def analyze_website(target_url: str, username: Optional[str] = None, passw
                 # 원래 페이지로 돌아가기 (페이지가 변경된 경우)
                 if page_changed:
                     await mcp__playwright__navigate_page(target_url)
-                    await asyncio.sleep(2)
+                    await asyncio.sleep(config.get('navigation_timeout', 2))
 
             except Exception as e:
-                print(f"❌ Playwright 클릭 실패 {i+1}: {str(e)}")
+                # 개선된 에러 처리
+                error_info = {
+                    'element': element,
+                    'error': str(e),
+                    'index': i,
+                    'timestamp': datetime.now() + timedelta(hours=9).isoformat()
+                }
+                failed_elements.append(error_info)
+                print(f"❌ Playwright 클릭 실패 [{i+1}/{len(elements_to_process)}]: {element.get('text', '')} - {str(e)}")
                 continue
 
         print(f"✅ Playwright 동적 탐색 완료: {len(dynamic_results)}개 페이지 탐색됨")
 
+        # 실패한 요소 요약 정보
+        if failed_elements:
+            print(f"⚠️ 실패한 요소: {len(failed_elements)}개")
+            for failed in failed_elements[:3]:  # 최대 3개만 표시
+                element_text = failed['element'].get('text', 'Unknown')
+                error_msg = failed['error']
+                print(f"   - {element_text}: {error_msg}")
+            if len(failed_elements) > 3:
+                print(f"   ... 그 외 {len(failed_elements)-3}개 요소")
+
     except Exception as e:
-        print(f"❌ Playwright 탐색 실패: {str(e)}")
+        print(f"❌ Playwright 탐색 치명적 실패: {str(e)}")
         dynamic_results = []
 
     # 4. 탐색된 페이지별 상세 보안 분석
@@ -956,12 +989,28 @@ if not all(mcp_status.values()):
 
 print("✅ MCP 서버 설치 확인 완료")
 
+# 설정 옵션
+config = {
+    'page_load_timeout': 3,          # 페이지 로딩 타임아웃 (초)
+    'click_timeout': 3,               # 클릭 후 대기 타임아웃 (초)
+    'navigation_timeout': 2,          # 페이지 이동 후 대기 (초)
+    'max_elements': None,             # 최대 클릭 요소 수 (None = 모두)
+    'element_discovery_timeout': 10,   # 요소 발견 타임아웃 (초)
+    'total_timeout': 300,             # 전체 분석 타임아웃 (초)
+}
+
 # 실행
 try:
-    menu_analysis = await analyze_website(target_url, username, password)
-    print(f"분석 완료: 총 {len(menu_analysis)}개 페이지 분석됨")
+    import time
+    start_time = time.time()
+
+    menu_analysis = await analyze_website(target_url, username, password, config)
+
+    elapsed_time = time.time() - start_time
+    print(f"✅ 분석 완료: 총 {len(menu_analysis)}개 페이지 분석됨 (소요 시간: {elapsed_time:.1f}초)")
+
 except Exception as e:
-    print(f"분석 중 치명적 오류 발생: {str(e)}")
+    print(f"❌ 분석 중 치명적 오류 발생: {str(e)}")
     # 부분 결과라도 저장
     menu_analysis = menu_analysis if 'menu_analysis' in locals() else []
 ```

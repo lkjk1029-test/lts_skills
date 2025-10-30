@@ -5,7 +5,7 @@ description: Comprehensive web security vulnerability analyzer that crawls entir
 
 # 종합 웹 보안 분석기 스킬
 
-이 스킬은 웹사이트 전체를 체계적으로 분석하여 모든 메뉴 구조와 보안 취약점을 식별하고, 상세한 엑셀 보고서를 생성한다. 공격을 수행하지 않고 코드 패턴과 요청 분석을 통해 취약점 가능성을 평가한다.
+이 스킬은 Playwright로 메뉴를 직접 클릭하여 탐색하고 Chrome DevTools로 상세 보안 분석을 수행하여 웹사이트 전체를 체계적으로 분석한다. 모든 메뉴 구조와 보안 취약점을 식별하고 상세한 엑셀 보고서를 생성하며, 공격을 수행하지 않고 코드 패턴과 요청 분석을 통해 취약점 가능성을 평가한다.
 
 ## 사용 시점
 
@@ -108,24 +108,18 @@ def validate_dependencies() -> bool:
     mcp_status = check_mcp_servers()
 
     # 둘 다 설치되어 있지 않으면 종료
-    if not any(mcp_status.values()):
+    if not all(mcp_status.values()):
         print("\n" + "=" * 50)
         print("❌ 스킬 실행 불가")
         print("=" * 50)
-        print("필수 MCP 서버가 설치되어 있지 않습니다:")
-        print("  • Chrome DevTools MCP (브라우저 자동화)")
-        print("  • Playwright MCP (웹 페이지 테스트)")
+        print("두 MCP 서버 모두 설치가 필수입니다:")
+        print("  • Chrome DevTools MCP (상세 분석 및 보안 점검)")
+        print("  • Playwright MCP (메뉴 클릭 및 네비게이션)")
         print("\n설치 방법:")
-        print("  Claude Code 설정에서 MCP 서버를 설치해주세요.")
+        print("  Claude Code 설정에서 두 MCP 서버를 모두 설치해주세요.")
         print("  자세한 설명: https://docs.claude.com/claude-code/mcp")
         print("=" * 50)
         return False
-
-    # 최소 하나라도 있으면 경고 메시지
-    if not all(mcp_status.values()):
-        missing_servers = [name for name, installed in mcp_status.items() if not installed]
-        print(f"\n⚠️ 일부 MCP 서버 미설치: {', '.join(missing_servers)}")
-        print("스킬 기능이 제한될 수 있습니다.")
 
     # 2. 파이썬 라이브러리 설치
     if not install_python_libraries():
@@ -433,63 +427,110 @@ async def discover_interactive_elements() -> List[Dict[str, Any]]:
         print(f"상호작용 요소 발견 실패: {str(e)}")
         return []
 
-async def click_and_analyze_element(element: Dict[str, Any]) -> Dict[str, Any]:
-    """요소를 클릭하고 결과 분석 (실제 사용자 행동 시뮬레이션)"""
+async def click_and_analyze_element_playwright(element: Dict[str, Any]) -> Dict[str, Any]:
+    """요소를 클릭하고 결과 분석 (Playwright 전용 - 메뉴 클릭용)"""
     try:
+        # 현재 페이지 정보 가져오기 (Chrome DevTools 사용)
         original_url = await mcp__chrome_devtools__evaluate_script("() => window.location.href")
+        original_title = await mcp__chrome_devtools__evaluate_script("() => document.title")
 
-        # 스냅샷으로 요소 UID 가져오기
-        snapshot = await mcp__chrome_devtools__take_snapshot(verbose=True)
-        element_uid = None
+        print(f"🖱️ Playwright 클릭 중: {element.get('text', 'Unknown')} ({element.get('elementType', 'unknown')})")
 
-        # 요소 UID 찾기 (selector와 index로)
-        for snapshot_element in snapshot.get('elements', []):
-            if (snapshot_element.get('selector') == element.get('selector') and
-                snapshot_element.get('index') == element.get('index')):
-                element_uid = snapshot_element.get('uid')
-                break
+        # Playwright로 페이지 접속 및 클릭
+        current_pages = await mcp__playwright__list_pages()
+        if not current_pages:
+            print("❌ Playwright 활성 페이지 없음 - 새 페이지 생성")
+            await mcp__playwright__new_page(original_url)
+            await asyncio.sleep(2)
+            current_pages = await mcp__playwright__list_pages()
 
-        if not element_uid:
-            print(f"요소 UID를 찾을 수 없음: {element.get('text', 'Unknown')}")
-            return None
-
-        print(f"클릭 중: {element.get('text', 'Unknown')} ({element.get('elementType', 'unknown')})")
+        # 활성 페이지 선택
+        page_idx = 0  # 첫 번째 페이지 사용
+        await mcp__playwright__select_page(page_idx)
 
         # 클릭 전 상태 저장
         before_click = {
-            url: original_url,
-            title: await mcp__chrome_devtools__evaluate_script("() => document.title"),
-            timestamp: datetime.now() + timedelta(hours=9).isoformat()
-        }
-
-        # 요소 클릭
-        await mcp__chrome_devtools__click(element_uid)
-
-        # 페이지 변경 대기 (동적 콘텐츠 로딩)
-        await asyncio.sleep(2)
-
-        # 클릭 후 상태 확인
-        after_click = {
-            url: await mcp__chrome_devtools__evaluate_script("() => window.location.href"),
-            title: await mcp__chrome_devtools__evaluate_script("() => document.title"),
-            timestamp: datetime.now() + timedelta(hours=9).isoformat()
-        }
-
-        # 페이지 변경 감지
-        page_changed = (before_click['url'] != after_click['url'] or
-                       before_click['title'] != after_click['title'])
-
-        return {
-            'element': element,
-            'before_click': before_click,
-            'after_click': after_click,
-            'page_changed': page_changed,
-            'analysis_type': 'click_interaction',
+            'url': original_url,
+            'title': original_title,
             'timestamp': datetime.now() + timedelta(hours=9).isoformat()
         }
 
+        # Playwright로 요소 클릭 시도
+        selector = element.get('selector', '')
+        element_text = element.get('text', '')
+
+        try:
+            # 여러 클릭 방법 시도
+            clicked = False
+
+            # 1. 텍스트 기반 클릭
+            if element_text:
+                try:
+                    await mcp__playwright__click(f"text={element_text}")
+                    clicked = True
+                    print(f"✅ 텍스트로 클릭 성공: {element_text}")
+                except Exception as e:
+                    print(f"⚠️ 텍스트 클릭 실패: {str(e)}")
+
+            # 2. 선택자 기반 클릭
+            if not clicked and selector:
+                try:
+                    await mcp__playwright__click(selector)
+                    clicked = True
+                    print(f"✅ 선택자로 클릭 성공: {selector}")
+                except Exception as e:
+                    print(f"⚠️ 선택자 클릭 실패: {str(e)}")
+
+            # 3. CSS 선택자 유추 클릭
+            if not clicked and element_text:
+                try:
+                    css_selector = f"button:has-text('{element_text}'), a:has-text('{element_text}'), input[value='{element_text}']"
+                    await mcp__playwright__click(css_selector)
+                    clicked = True
+                    print(f"✅ 유추 선택자로 클릭 성공: {element_text}")
+                except Exception as e:
+                    print(f"⚠️ 유추 선택자 클릭 실패: {str(e)}")
+
+            if not clicked:
+                print(f"❌ 클릭 실패: {element_text}")
+                return None
+
+            # 클릭 후 대기 (페이지 로딩)
+            await asyncio.sleep(3)
+
+            # 클릭 후 상태 확인 (Chrome DevTools와 Playwright 모두 사용)
+            after_url_cd = await mcp__chrome_devtools__evaluate_script("() => window.location.href")
+            after_title_cd = await mcp__chrome_devtools__evaluate_script("() => document.title")
+
+            after_click = {
+                'url': after_url_cd,
+                'title': after_title_cd,
+                'timestamp': datetime.now() + timedelta(hours=9).isoformat()
+            }
+
+            # 페이지 변경 감지
+            page_changed = (before_click['url'] != after_click['url'] or
+                           before_click['title'] != after_click['title'])
+
+            result = {
+                'element': element,
+                'before_click': before_click,
+                'after_click': after_click,
+                'page_changed': page_changed,
+                'analysis_type': 'playwright_click',
+                'click_method': 'text_based' if element_text else 'selector_based',
+                'timestamp': datetime.now() + timedelta(hours=9).isoformat()
+            }
+
+            print(f"✅ 클릭 분석 완료: 페이지 변경 {'O' if page_changed else 'X'}")
+            return result
+
+        except Exception as click_error:
+            print(f"❌ Playwright 클릭 중 오류: {str(click_error)}")
+            return None
+
     except Exception as e:
-        print(f"요소 클릭 분석 실패: {element.get('text', 'Unknown')} - {str(e)}")
+        print(f"❌ Playwright 클릭 분석 실패: {element.get('text', 'Unknown')} - {str(e)}")
         return None
 
 async def explore_dynamic_content(current_url: str, skip_dynamic: bool = False) -> List[Dict[str, Any]]:
@@ -525,10 +566,10 @@ async def explore_dynamic_content(current_url: str, skip_dynamic: bool = False) 
             try:
                 print(f"🔍 요소 분석 중 ({i+1}/{max_elements}): {element.get('text', '')[:20]}...")
 
-                # 클릭 및 분석 (타임아웃 적용)
+                # 클릭 및 분석 (Playwright 전용, 타임아웃 적용)
                 result = await asyncio.wait_for(
-                    click_and_analyze_element(element),
-                    timeout=10  # 10초 타임아웃
+                    click_and_analyze_element_playwright(element),
+                    timeout=15  # 15초 타임아웃 (Playwright는 더 길게)
                 )
 
                 if result:
@@ -3502,7 +3543,7 @@ def create_markdown_report(data: List[Dict[str, str]], output_file: str, target_
 | 분석 대상 | {target_url} |
 | 분석 일자 | {report_date} |
 | 총 분석 항목 | {total_items}개 |
-| 분석 방식 | Chrome DevTools + 패턴 분석 (공격 없음) |
+| 분석 방식 | Playwright + Chrome DevTools (공격 없음) |
 
 ## 분석 결과 요약
 
@@ -3622,7 +3663,7 @@ def create_markdown_report(data: List[Dict[str, str]], output_file: str, target_
         content += f"""
 ## 분석 메타 정보
 
-- **분석 도구**: Chrome DevTools + 자동화 스크립트
+- **분석 도구**: Playwright + Chrome DevTools
 - **분석 방식**: 공격 없는 코드 패턴 분석
 - **분석 시각**: {report_date}
 - **총 분석 시간**: 자동 수집 및 분석

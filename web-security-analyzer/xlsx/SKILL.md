@@ -37,7 +37,7 @@ import importlib
 from typing import Dict, List, Any
 
 def check_mcp_servers() -> Dict[str, bool]:
-    """MCP 서버 설치 여부 확인 (Playwright 우선)"""
+    """MCP 서버 설치 여부 확인 (Playwright 우선, Chrome DevTools는 네트워크 분석용)"""
     mcp_status = {
         'playwright': False,
         'chrome-devtools': False
@@ -45,21 +45,21 @@ def check_mcp_servers() -> Dict[str, bool]:
 
     print("🔍 MCP 서버 설치 여부 확인 중...")
 
-    # Playwright MCP 확인 (우선)
+    # Playwright MCP 확인 (필수 - 동적 분석용)
     try:
         # mcp__playwright__new_page 같은 함수 호출로 확인
         test_result = mcp__playwright__new_page("about:blank")
         mcp_status['playwright'] = True
-        print("✅ Playwright MCP 설치됨 (동적 분석 우선)")
+        print("✅ Playwright MCP 설치됨 (동적 분석용)")
     except Exception as e:
         print(f"❌ Playwright MCP 미설치 또는 오류: {str(e)}")
 
-    # Chrome DevTools MCP 확인 (선택사항)
+    # Chrome DevTools MCP 확인 (선택사항 - 네트워크 분석용)
     try:
         # mcp__chrome_devtools__list_pages 같은 함수 호출로 확인
         test_result = mcp__chrome_devtools__list_pages()
         mcp_status['chrome-devtools'] = True
-        print("✅ Chrome DevTools MCP 설치됨 (선택사항)")
+        print("✅ Chrome DevTools MCP 설치됨 (네트워크 분석용)")
     except Exception as e:
         print(f"❌ Chrome DevTools MCP 미설치 (선택사항): {str(e)}")
 
@@ -2387,7 +2387,7 @@ if not mcp_status.get('playwright'):
 print("✅ MCP 서버 설치 확인 완료")
 print(f"   • Playwright MCP: {'✅'} (동적 분석 전용)")
 if mcp_status.get('chrome-devtools'):
-    print(f"   • Chrome DevTools MCP: {'✅'} (선택사항 - 네트워크 분석용)")
+    print(f"   • Chrome DevTools MCP: {'✅'} (네트워크 분석용)")
 else:
     print(f"   • Chrome DevTools MCP: {'❌'} (선택사항)")
 
@@ -4255,12 +4255,10 @@ async def analyze_page_security(url: str, menu_text: str, element_info: Dict[str
         realtime_network = await monitor_realtime_network(duration=10)
         print(f"✅ 실시간 네트워크 분석 완료: {len(realtime_network)}개 요청 감지")
 
-        # 3. 기존 네트워크 요청 수집
+        # 3. Playwright 동적 네트워크 수집 (진행 중인 요청만)
         try:
-            # 보조: Chrome DevTools 히스토리 네트워크 분석 (Playwright 동적 분석 보완용)
-            historical_network = await mcp__chrome_devtools__list_network_requests(
-                pageSize=50, includePreservedRequests=True
-            )
+            # Playwright 기반이므로 히스토리 네트워크 분석 불필요
+            historical_network = []
         except Exception as e:
             print(f"과거 네트워크 요청 수집 실패: {str(e)}")
             historical_network = []
@@ -6022,10 +6020,10 @@ async def simulate_authentication_flows() -> Dict[str, Any]:
 print("🎯 웹 보안 분석기 - AI 기반 종합 보안 기능 테스트")
 print("=" * 60)
 
-# 분석 대상 URL 및 인증 정보 설정
-target_url = "http://localhost:8888/"
+# 분석 대상 URL 및 인증 정보 설정 (사용자 입력)
+target_url = "http://localhost:8888/"  # 사용자가 지정한 URL
 username = None  # Jupyter는 보통 username 없이 password만 사용
-password = "mypassword"
+password = "mypassword"  # 사용자가 지정한 비밀번호
 
 print(f"🌐 분석 대상: {target_url}")
 print(f"🔐 비밀번호: {'*' * len(password) if password else '없음'}")
@@ -6050,10 +6048,7 @@ if not mcp_status.get('playwright'):
 
 print("✅ MCP 서버 설치 확인 완료")
 print(f"   • Playwright MCP: {'✅' if mcp_status.get('playwright') else '❌'} (동적 분석 전용)")
-if mcp_status.get('chrome-devtools'):
-    print(f"   • Chrome DevTools MCP: {'✅'} (선택사항 - 네트워크 분석용)")
-else:
-    print(f"   • Chrome DevTools MCP: {'❌'} (선택사항)")
+print("   • Chrome DevTools MCP: ❌ (사용 안 함 - Playwright만 사용)")
 
 # 설정 가져오기
 config = get_analysis_config()
@@ -6158,6 +6153,14 @@ except Exception as e:
     print(f"❌ 분석 중 치명적 오류 발생: {str(e)}")
     import traceback
     print(f"상세 오류: {traceback.format_exc()}")
+
+# 즉시 실행
+import asyncio
+await run_web_security_analysis(
+    target_url="http://localhost:8888/",
+    password="mypassword",
+    username=None
+)
 
 ## 중요 사항
 

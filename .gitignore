@@ -1,6 +1,5 @@
 # Claude-specific files
 .claude/
-.claude-plugin/
 
 # IDE files
 .vscode/

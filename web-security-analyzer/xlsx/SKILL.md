@@ -119,11 +119,12 @@ security_info = await mcp__chrome_devtools__evaluate_script("""
 
 ### 5. 엑셀 보고서 생성
 
-`scripts/excel_generator.py`를 사용하여 분석 결과를 엑셀 파일로 생성한다:
+상대 경로의 `scripts/excel_generator.py`를 사용하여 분석 결과를 엑셀 파일로 생성한다. 스킬 실행 시 현재 작업 디렉토리를 기준으로 파일을 생성한다:
 
 ```python
 import sys
-sys.path.append('scripts')
+import os
+sys.path.append(os.path.join(os.path.dirname(__file__), 'scripts'))
 from excel_generator import ExcelReportGenerator
 
 # 분석 결과 통합
@@ -135,9 +136,10 @@ analysis_results = {
     'endpoints': api_endpoints
 }
 
-# 보고서 생성
+# 보고서 생성 (현재 작업 디렉토리에 생성)
+output_file = os.path.join(os.getcwd(), 'website_security_analysis.xlsx')
 generator = ExcelReportGenerator(analysis_results)
-generator.create_report('website_security_analysis.xlsx')
+generator.create_report(output_file)
 ```
 
 보고서에는 다음 시트가 포함된다:
@@ -270,4 +272,13 @@ mcp__playwright__browser_take_screenshot()
 - `references/vulnerability_checklist.md`: 취약점 점검 체크리스트
 - `references/chrome_devtools_guide.md`: Chrome DevTools 활용 가이드
 - `references/playwright_automation.md`: Playwright 자동화 스크립트 예제
-- `assets/report_template.xlsx`: 보고서 템플릿 (선택사항)
+
+## 파일 경로 안내
+
+이 스킬은 현재 프로젝트 디렉토리에 설치되어 있으며, 모든 파일 경로는 상대 경로를 사용한다:
+- **스킬 루트**: `web-security-analyzer/xlsx/`
+- **스크립트**: `web-security-analyzer/xlsx/scripts/`
+- **참고자료**: `web-security-analyzer/xlsx/references/`
+- **출력 파일**: 현재 작업 디렉토리 (보통 프로젝트 루트)
+
+엑셀 보고서와 같은 출력 파일은 현재 작업 디렉토리에 생성되므로 사용자가 쉽게 찾을 수 있다.

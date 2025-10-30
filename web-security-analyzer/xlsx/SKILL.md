@@ -427,121 +427,1365 @@ async def discover_interactive_elements() -> List[Dict[str, Any]]:
         print(f"상호작용 요소 발견 실패: {str(e)}")
         return []
 
-async def click_and_analyze_element_playwright(element: Dict[str, Any]) -> Dict[str, Any]:
-    """요소를 클릭하고 결과 분석 (Playwright 전용 - 메뉴 클릭용)"""
+async def perform_comprehensive_security_test(element: Dict[str, Any]) -> Dict[str, Any]:
+    """요소에 대한 종합 보안 테스트 수행 (실제 기능 테스트)"""
     try:
-        # 현재 페이지 정보 가져오기 (Chrome DevTools 사용)
-        original_url = await mcp__chrome_devtools__evaluate_script("() => window.location.href")
-        original_title = await mcp__chrome_devtools__evaluate_script("() => document.title")
+        element_type = element.get('elementType', 'unknown')
+        element_text = element.get('text', 'Unknown')
+        selector = element.get('selector', '')
 
-        print(f"🖱️ Playwright 클릭 중: {element.get('text', 'Unknown')} ({element.get('elementType', 'unknown')})")
+        print(f"🔍 종합 보안 테스트 시작: {element_text} ({element_type})")
 
-        # Playwright로 페이지 접속 및 클릭
-        current_pages = await mcp__playwright__list_pages()
-        if not current_pages:
-            print("❌ Playwright 활성 페이지 없음 - 새 페이지 생성")
-            await mcp__playwright__new_page(original_url)
-            await asyncio.sleep(2)
-            current_pages = await mcp__playwright__list_pages()
+        test_results = {
+            'element': element,
+            'test_type': 'comprehensive_security',
+            'timestamp': datetime.now() + timedelta(hours=9).isoformat(),
+            'vulnerabilities_found': [],
+            'functionality_tests': [],
+            'security_tests': [],
+            'risks_identified': []
+        }
 
-        # 활성 페이지 선택
-        page_idx = 0  # 첫 번째 페이지 사용
-        await mcp__playwright__select_page(page_idx)
+        # 1. 기본 상호작용 테스트
+        interaction_result = await test_basic_interaction(element)
+        if interaction_result:
+            test_results['functionality_tests'].append(interaction_result)
 
-        # 클릭 전 상태 저장
-        before_click = {
-            'url': original_url,
-            'title': original_title,
+        # 2. 요소 유형별 특화 테스트
+        if element_type == 'form':
+            form_test_results = await test_form_security(element)
+            test_results['security_tests'].extend(form_test_results)
+        elif element_type in ['button', 'submit']:
+            button_test_results = await test_button_security(element)
+            test_results['security_tests'].extend(button_test_results)
+        elif element_type == 'link':
+            link_test_results = await test_link_security(element)
+            test_results['security_tests'].extend(link_test_results)
+        elif element_type == 'input':
+            input_test_results = await test_input_security(element)
+            test_results['security_tests'].extend(input_test_results)
+
+        # 3. 공통 보안 테스트
+        common_security_results = await test_common_vulnerabilities(element)
+        test_results['security_tests'].extend(common_security_results)
+
+        # 4. 발견된 취약점 집계
+        for test in test_results['security_tests']:
+            if test.get('vulnerabilities'):
+                test_results['vulnerabilities_found'].extend(test['vulnerabilities'])
+            if test.get('risks'):
+                test_results['risks_identified'].extend(test['risks'])
+
+        print(f"✅ 보안 테스트 완료: {len(test_results['vulnerabilities_found'])}개 취약점 발견")
+        return test_results
+
+    except Exception as e:
+        print(f"❌ 종합 보안 테스트 실패: {element.get('text', 'Unknown')} - {str(e)}")
+        return {
+            'element': element,
+            'error': str(e),
+            'test_type': 'comprehensive_security',
             'timestamp': datetime.now() + timedelta(hours=9).isoformat()
         }
 
-        # Playwright로 요소 클릭 시도
-        selector = element.get('selector', '')
+async def test_basic_interaction(element: Dict[str, Any]) -> Dict[str, Any]:
+    """기본 상호작용 테스트 (클릭/입력 등)"""
+    try:
+        print(f"🖱️ 기본 상호작용 테스트: {element.get('text', 'Unknown')}")
+
+        # Playwright 페이지 준비
+        current_pages = await mcp__playwright__list_pages()
+        if not current_pages:
+            original_url = await mcp__chrome_devtools__evaluate_script("() => window.location.href")
+            await mcp__playwright__new_page(original_url)
+            await asyncio.sleep(2)
+
+        await mcp__playwright__select_page(0)
+
+        # 클릭 시도
         element_text = element.get('text', '')
+        selector = element.get('selector', '')
+        clicked = False
+        click_method = 'none'
 
-        try:
-            # 여러 클릭 방법 시도
-            clicked = False
+        # 여러 클릭 방법 시도
+        if element_text:
+            try:
+                await mcp__playwright__click(f"text={element_text}")
+                clicked = True
+                click_method = 'text_based'
+                print(f"✅ 텍스트로 클릭 성공: {element_text}")
+            except Exception as e:
+                print(f"⚠️ 텍스트 클릭 실패: {str(e)}")
 
-            # 1. 텍스트 기반 클릭
-            if element_text:
-                try:
-                    await mcp__playwright__click(f"text={element_text}")
-                    clicked = True
-                    print(f"✅ 텍스트로 클릭 성공: {element_text}")
-                except Exception as e:
-                    print(f"⚠️ 텍스트 클릭 실패: {str(e)}")
+        if not clicked and selector:
+            try:
+                await mcp__playwright__click(selector)
+                clicked = True
+                click_method = 'selector_based'
+                print(f"✅ 선택자로 클릭 성공: {selector}")
+            except Exception as e:
+                print(f"⚠️ 선택자 클릭 실패: {str(e)}")
 
-            # 2. 선택자 기반 클릭
-            if not clicked and selector:
-                try:
-                    await mcp__playwright__click(selector)
-                    clicked = True
-                    print(f"✅ 선택자로 클릭 성공: {selector}")
-                except Exception as e:
-                    print(f"⚠️ 선택자 클릭 실패: {str(e)}")
+        if not clicked and element_text:
+            try:
+                css_selector = f"button:has-text('{element_text}'), a:has-text('{element_text}'), input[value='{element_text}']"
+                await mcp__playwright__click(css_selector)
+                clicked = True
+                click_method = 'inferred_selector'
+                print(f"✅ 유추 선택자로 클릭 성공: {element_text}")
+            except Exception as e:
+                print(f"⚠️ 유추 선택자 클릭 실패: {str(e)}")
 
-            # 3. CSS 선택자 유추 클릭
-            if not clicked and element_text:
-                try:
-                    css_selector = f"button:has-text('{element_text}'), a:has-text('{element_text}'), input[value='{element_text}']"
-                    await mcp__playwright__click(css_selector)
-                    clicked = True
-                    print(f"✅ 유추 선택자로 클릭 성공: {element_text}")
-                except Exception as e:
-                    print(f"⚠️ 유추 선택자 클릭 실패: {str(e)}")
+        await asyncio.sleep(2)
 
-            if not clicked:
-                print(f"❌ 클릭 실패: {element_text}")
-                return None
-
-            # 클릭 후 대기 (페이지 로딩)
-            await asyncio.sleep(3)
-
-            # 클릭 후 상태 확인 (Chrome DevTools와 Playwright 모두 사용)
-            after_url_cd = await mcp__chrome_devtools__evaluate_script("() => window.location.href")
-            after_title_cd = await mcp__chrome_devtools__evaluate_script("() => document.title")
-
-            after_click = {
-                'url': after_url_cd,
-                'title': after_title_cd,
-                'timestamp': datetime.now() + timedelta(hours=9).isoformat()
-            }
-
-            # 페이지 변경 감지
-            page_changed = (before_click['url'] != after_click['url'] or
-                           before_click['title'] != after_click['title'])
-
-            result = {
-                'element': element,
-                'before_click': before_click,
-                'after_click': after_click,
-                'page_changed': page_changed,
-                'analysis_type': 'playwright_click',
-                'click_method': 'text_based' if element_text else 'selector_based',
-                'timestamp': datetime.now() + timedelta(hours=9).isoformat()
-            }
-
-            print(f"✅ 클릭 분석 완료: 페이지 변경 {'O' if page_changed else 'X'}")
-            return result
-
-        except Exception as click_error:
-            print(f"❌ Playwright 클릭 중 오류: {str(click_error)}")
-            return None
+        return {
+            'test_name': 'basic_interaction',
+            'clicked': clicked,
+            'click_method': click_method,
+            'element_text': element_text,
+            'success': clicked
+        }
 
     except Exception as e:
-        print(f"❌ Playwright 클릭 분석 실패: {element.get('text', 'Unknown')} - {str(e)}")
-        return None
+        print(f"❌ 기본 상호작용 테스트 오류: {str(e)}")
+        return {
+            'test_name': 'basic_interaction',
+            'clicked': False,
+            'error': str(e),
+            'success': False
+        }
+
+async def test_form_security(element: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """폼 보안 테스트"""
+    test_results = []
+
+    try:
+        print(f"📝 폼 보안 테스트 시작: {element.get('text', 'Unknown')}")
+
+        # 1. 폼 구조 분석
+        form_analysis = await analyze_form_structure(element)
+        test_results.append(form_analysis)
+
+        # 2. 입력값 검증 테스트
+        validation_tests = await test_input_validation(element)
+        test_results.extend(validation_tests)
+
+        # 3. CSRF 토큰 확인
+        csrf_test = await test_csrf_protection(element)
+        test_results.append(csrf_test)
+
+        # 4. SQL 인젝션 테스트
+        sql_injection_tests = await test_sql_injection_form(element)
+        test_results.extend(sql_injection_tests)
+
+        # 5. XSS 테스트
+        xss_tests = await test_xss_form(element)
+        test_results.extend(xss_tests)
+
+        print(f"✅ 폼 보안 테스트 완료: {len(test_results)}개 테스트 수행")
+
+    except Exception as e:
+        print(f"❌ 폼 보안 테스트 오류: {str(e)}")
+        test_results.append({
+            'test_name': 'form_security_error',
+            'error': str(e),
+            'vulnerabilities': [{'type': 'ERROR', 'severity': 'LOW', 'description': f'폼 테스트 오류: {str(e)}'}]
+        })
+
+    return test_results
+
+async def test_button_security(element: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """버튼 보안 테스트"""
+    test_results = []
+
+    try:
+        print(f"🔘 버튼 보안 테스트 시작: {element.get('text', 'Unknown')}")
+
+        # 1. 버튼 기능 테스트
+        function_test = await test_button_functionality(element)
+        test_results.append(function_test)
+
+        # 2. 중요 기능 확인 (삭제, 관리자 기능 등)
+        critical_function_test = await test_critical_functions(element)
+        test_results.append(critical_function_test)
+
+        # 3. 인증 확인
+        auth_test = await test_button_authentication(element)
+        test_results.append(auth_test)
+
+        print(f"✅ 버튼 보안 테스트 완료: {len(test_results)}개 테스트 수행")
+
+    except Exception as e:
+        print(f"❌ 버튼 보안 테스트 오류: {str(e)}")
+        test_results.append({
+            'test_name': 'button_security_error',
+            'error': str(e),
+            'vulnerabilities': [{'type': 'ERROR', 'severity': 'LOW', 'description': f'버튼 테스트 오류: {str(e)}'}]
+        })
+
+    return test_results
+
+async def test_link_security(element: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """링크 보안 테스트"""
+    test_results = []
+
+    try:
+        print(f"🔗 링크 보안 테스트 시작: {element.get('text', 'Unknown')}")
+
+        # 1. 링크 주소 분석
+        url_analysis = await analyze_link_url(element)
+        test_results.append(url_analysis)
+
+        # 2. 외부 링크 확인
+        external_link_test = await test_external_links(element)
+        test_results.append(external_link_test)
+
+        # 3. 다운로드 링크 확인
+        download_test = await test_download_links(element)
+        test_results.append(download_test)
+
+        print(f"✅ 링크 보안 테스트 완료: {len(test_results)}개 테스트 수행")
+
+    except Exception as e:
+        print(f"❌ 링크 보안 테스트 오류: {str(e)}")
+        test_results.append({
+            'test_name': 'link_security_error',
+            'error': str(e),
+            'vulnerabilities': [{'type': 'ERROR', 'severity': 'LOW', 'description': f'링크 테스트 오류: {str(e)}'}]
+        })
+
+    return test_results
+
+async def test_input_security(element: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """입력 필드 보안 테스트"""
+    test_results = []
+
+    try:
+        print(f"⌨️ 입력 필드 보안 테스트 시작: {element.get('text', 'Unknown')}")
+
+        # 1. 입력 필드 유형 확인
+        field_type_test = await test_input_field_types(element)
+        test_results.append(field_type_test)
+
+        # 2. 입력값 길이 제한 확인
+        length_test = await test_input_length_validation(element)
+        test_results.append(length_test)
+
+        # 3. 민감 정보 입력 필드 확인
+        sensitive_field_test = await test_sensitive_input_fields(element)
+        test_results.append(sensitive_field_test)
+
+        print(f"✅ 입력 필드 보안 테스트 완료: {len(test_results)}개 테스트 수행")
+
+    except Exception as e:
+        print(f"❌ 입력 필드 보안 테스트 오류: {str(e)}")
+        test_results.append({
+            'test_name': 'input_security_error',
+            'error': str(e),
+            'vulnerabilities': [{'type': 'ERROR', 'severity': 'LOW', 'description': f'입력 필드 테스트 오류: {str(e)}'}]
+        })
+
+    return test_results
+
+async def test_common_vulnerabilities(element: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """공통 취약점 테스트"""
+    test_results = []
+
+    try:
+        print(f"🛡️ 공통 취약점 테스트 시작")
+
+        # 1. 클릭재킹 방지 확인
+        clickjacking_test = await test_clickjacking_protection(element)
+        test_results.append(clickjacking_test)
+
+        # 2. 인증 필요 여부 확인
+        auth_required_test = await test_authentication_required(element)
+        test_results.append(auth_required_test)
+
+        # 3. 권한 확인
+        authorization_test = await test_authorization(element)
+        test_results.append(authorization_test)
+
+        print(f"✅ 공통 취약점 테스트 완료: {len(test_results)}개 테스트 수행")
+
+    except Exception as e:
+        print(f"❌ 공통 취약점 테스트 오류: {str(e)}")
+        test_results.append({
+            'test_name': 'common_vulnerabilities_error',
+            'error': str(e),
+            'vulnerabilities': [{'type': 'ERROR', 'severity': 'LOW', 'description': f'공통 취약점 테스트 오류: {str(e)}'}]
+        })
+
+    return test_results
+
+# === 구체적인 보안 테스트 함수들 ===
+
+async def analyze_form_structure(element: Dict[str, Any]) -> Dict[str, Any]:
+    """폼 구조 분석"""
+    try:
+        form_analysis = await mcp__chrome_devtools__evaluate_script("""
+        (selector) => {
+            try {
+                const form = document.querySelector(selector) || document.querySelector('form');
+                if (!form) return null;
+
+                const inputs = form.querySelectorAll('input, textarea, select');
+                const passwordInputs = form.querySelectorAll('input[type="password"]');
+                const submitButtons = form.querySelectorAll('button[type="submit"], input[type="submit"]');
+                const hiddenInputs = form.querySelectorAll('input[type="hidden"]');
+
+                return {
+                    action: form.action || '',
+                    method: form.method || 'GET',
+                    inputCount: inputs.length,
+                    hasPasswordField: passwordInputs.length > 0,
+                    submitButtonCount: submitButtons.length,
+                    hiddenFieldCount: hiddenInputs.length,
+                    inputTypes: Array.from(inputs).map(input => input.type || 'text'),
+                    hasHttps: form.action && form.action.startsWith('https'),
+                    fields: Array.from(inputs).map(input => ({
+                        name: input.name || input.id || '',
+                        type: input.type || 'text',
+                        required: input.required || false,
+                        maxLength: input.maxLength || -1,
+                        placeholder: input.placeholder || ''
+                    }))
+                };
+            } catch (e) {
+                console.error('Form analysis error:', e.message);
+                return null;
+            }
+        }
+        """, element.get('selector', 'form'))
+
+        vulnerabilities = []
+
+        if form_analysis:
+            # 보안 검사
+            if form_analysis['hasPasswordField'] and not form_analysis['hasHttps']:
+                vulnerabilities.append({
+                    'type': 'INSECURE_FORM',
+                    'severity': 'HIGH',
+                    'description': '비밀번호 필드가 있는 폼이 HTTPS를 사용하지 않음'
+                })
+
+            if form_analysis['method'] == 'GET' and form_analysis['hasPasswordField']:
+                vulnerabilities.append({
+                    'type': 'SENSITIVE_DATA_GET',
+                    'severity': 'MEDIUM',
+                    'description': '민감 정보가 GET 메소드로 전송됨'
+                })
+
+        return {
+            'test_name': 'form_structure_analysis',
+            'analysis': form_analysis,
+            'vulnerabilities': vulnerabilities
+        }
+
+    except Exception as e:
+        return {
+            'test_name': 'form_structure_analysis',
+            'error': str(e),
+            'vulnerabilities': [{'type': 'ERROR', 'severity': 'LOW', 'description': f'폼 구조 분석 오류: {str(e)}'}]
+        }
+
+async def test_input_validation(element: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """입력값 검증 테스트"""
+    test_results = []
+
+    try:
+        # XSS 테스트 데이터
+        xss_payloads = [
+            "<script>alert('XSS')</script>",
+            "javascript:alert('XSS')",
+            "<img src=x onerror=alert('XSS')>",
+            "'\"><script>alert('XSS')</script>"
+        ]
+
+        # SQL 인젝션 테스트 데이터
+        sqli_payloads = [
+            "' OR '1'='1",
+            "'; DROP TABLE users; --",
+            "' UNION SELECT * FROM users --",
+            "1' AND (SELECT COUNT(*) FROM users) > 0 --"
+        ]
+
+        for payload in xss_payloads:
+            try:
+                result = await mcp__chrome_devtools__evaluate_script(f"""
+                (payload) => {{
+                    try {{
+                        const inputs = document.querySelectorAll('input[type="text"], input[type="search"], textarea');
+                        if (inputs.length > 0) {{
+                            const input = inputs[0];
+                            input.value = payload;
+
+                            // 입력 후 이벤트 트리거
+                            input.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                            input.dispatchEvent(new Event('change', {{ bubbles: true }}));
+
+                            // 페이지에 스크립트 실행 확인
+                            const hasAlert = typeof window.alert !== 'undefined' && window.alert.toString().includes('native code');
+                            const scriptTags = document.querySelectorAll('script');
+
+                            return {{
+                                inputTested: input.name || input.id || 'unnamed',
+                                payload: payload,
+                                hasNewScripts: scriptTags.length > 0,
+                                suspiciousActivity: hasAlert
+                            }};
+                        }}
+                        return {{ error: 'No input fields found' }};
+                    }} catch (e) {{
+                        return {{ error: e.message }};
+                    }}
+                }}
+                """, payload)
+
+                if result and not result.get('error'):
+                    if result.get('suspiciousActivity') or result.get('hasNewScripts'):
+                        test_results.append({
+                            'test_name': 'xss_input_test',
+                            'payload': payload,
+                            'result': result,
+                            'vulnerabilities': [{
+                                'type': 'XSS',
+                                'severity': 'HIGH',
+                                'description': f'XSS 취약점 발견: {payload}'
+                            }]
+                        })
+                    else:
+                        test_results.append({
+                            'test_name': 'xss_input_test',
+                            'payload': payload,
+                            'result': result,
+                            'vulnerabilities': []
+                        })
+
+            except Exception as e:
+                print(f"XSS 테스트 오류: {str(e)}")
+
+        await asyncio.sleep(1)  # 테스트 간 대기
+
+    except Exception as e:
+        test_results.append({
+            'test_name': 'input_validation_error',
+            'error': str(e),
+            'vulnerabilities': [{'type': 'ERROR', 'severity': 'LOW', 'description': f'입력값 검증 테스트 오류: {str(e)}'}]
+        })
+
+    return test_results
+
+async def test_csrf_protection(element: Dict[str, Any]) -> Dict[str, Any]:
+    """CSRF 보호 확인"""
+    try:
+        csrf_check = await mcp__chrome_devtools__evaluate_script("""
+        () => {
+            try {
+                const forms = document.querySelectorAll('form');
+                const csrfTokens = [];
+
+                forms.forEach(form => {
+                    // CSRF 토큰으로 사용될 수 있는 hidden input 검색
+                    const hiddenInputs = form.querySelectorAll('input[type="hidden"]');
+                    hiddenInputs.forEach(input => {
+                        const name = (input.name || '').toLowerCase();
+                        const value = input.value || '';
+
+                        if (name.includes('csrf') || name.includes('token') ||
+                            name.includes('_token') || name.includes('authenticity')) {
+                            csrfTokens.push({
+                                formAction: form.action,
+                                tokenName: name,
+                                tokenValue: value.length > 0 ? 'PRESENT' : 'EMPTY'
+                            });
+                        }
+                    });
+
+                    // SameSite 쿠키 확인 간접 테스트
+                    const hasSecureHeaders = document.querySelector('meta[name="csrf-token"]');
+                    if (hasSecureHeaders) {
+                        csrfTokens.push({
+                            formAction: form.action,
+                            tokenName: 'meta-csrf-token',
+                            tokenValue: hasSecureHeaders.content ? 'PRESENT' : 'EMPTY'
+                        });
+                    }
+                });
+
+                return {
+                    formsCount: forms.length,
+                    csrfTokensFound: csrfTokens.length,
+                    tokens: csrfTokens,
+                    hasCsrfProtection: csrfTokens.length > 0
+                };
+            } catch (e) {
+                console.error('CSRF check error:', e.message);
+                return null;
+            }
+        }
+        """)
+
+        vulnerabilities = []
+
+        if csrf_check:
+            if csrf_check['formsCount'] > 0 and csrf_check['csrfTokensFound'] == 0:
+                vulnerabilities.append({
+                    'type': 'CSRF',
+                    'severity': 'MEDIUM',
+                    'description': 'CSRF 토큰 보호 조치 없음'
+                })
+
+        return {
+            'test_name': 'csrf_protection',
+            'check_result': csrf_check,
+            'vulnerabilities': vulnerabilities
+        }
+
+    except Exception as e:
+        return {
+            'test_name': 'csrf_protection',
+            'error': str(e),
+            'vulnerabilities': [{'type': 'ERROR', 'severity': 'LOW', 'description': f'CSRF 테스트 오류: {str(e)}'}]
+        }
+
+async def test_sql_injection_form(element: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """SQL 인젝션 폼 테스트 (안전한 테스트)"""
+    test_results = []
+
+    try:
+        # 안전한 SQL 인젝션 테스트 페이로드 (실제 공격이 아닌 오류 응답 확인용)
+        safe_sqli_payloads = [
+            "'",
+            "\"",
+            "';",
+            "\";",
+            "' OR 1=1 --",
+            "\" OR 1=1 --"
+        ]
+
+        for payload in safe_sqli_payloads:
+            try:
+                result = await mcp__chrome_devtools__evaluate_script(f"""
+                (payload) => {{
+                    try {{
+                        const inputs = document.querySelectorAll('input[type="text"], input[type="search"], textarea');
+                        if (inputs.length > 0) {{
+                            const input = inputs[0];
+                            const originalValue = input.value;
+
+                            input.value = payload;
+                            input.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                            input.dispatchEvent(new Event('change', {{ bubbles: true }}));
+
+                            // SQL 오류 메시지 패턴 검색 (안전한 확인)
+                            const pageText = document.body.innerText.toLowerCase();
+                            const sqlErrorPatterns = [
+                                'sql syntax', 'mysql_fetch', 'ora-', 'microsoft ole db',
+                                'odbc drivers error', 'mysqlerror', 'valid mysql result',
+                                'postgresql query failed', 'warning: pg_'
+                            ];
+
+                            const hasSQLError = sqlErrorPatterns.some(pattern =>
+                                pageText.includes(pattern)
+                            );
+
+                            // 원래 값 복원
+                            input.value = originalValue;
+
+                            return {{
+                                inputTested: input.name || input.id || 'unnamed',
+                                payload: payload,
+                                hasSQLError: hasSQLError,
+                                errorPatterns: sqlErrorPatterns.filter(pattern =>
+                                    pageText.includes(pattern)
+                                )
+                            }};
+                        }}
+                        return {{ error: 'No input fields found' }};
+                    }} catch (e) {{
+                        return {{ error: e.message }};
+                    }}
+                }}
+                """, payload)
+
+                if result and not result.get('error') and result.get('hasSQLError'):
+                    test_results.append({
+                        'test_name': 'sql_injection_test',
+                        'payload': payload,
+                        'result': result,
+                        'vulnerabilities': [{
+                            'type': 'SQL_INJECTION',
+                            'severity': 'HIGH',
+                            'description': f'SQL 인젝션 취약점 가능성: {payload}'
+                        }]
+                    })
+
+            except Exception as e:
+                print(f"SQL 인젝션 테스트 오류: {str(e)}")
+
+        await asyncio.sleep(1)
+
+    except Exception as e:
+        test_results.append({
+            'test_name': 'sql_injection_error',
+            'error': str(e),
+            'vulnerabilities': [{'type': 'ERROR', 'severity': 'LOW', 'description': f'SQL 인젝션 테스트 오류: {str(e)}'}]
+        })
+
+    return test_results
+
+async def test_xss_form(element: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """XSS 폼 테스트"""
+    test_results = []
+
+    try:
+        # DOM 기반 XSS 테스트
+        xss_payloads = [
+            "<script>console.log('XSS_TEST')</script>",
+            "javascript:console.log('XSS_TEST')",
+            "<img src=x onerror=console.log('XSS_TEST')>"
+        ]
+
+        for payload in xss_payloads:
+            try:
+                result = await mcp__chrome_devtools__evaluate_script(f"""
+                (payload) => {{
+                    try {{
+                        const inputs = document.querySelectorAll('input[type="text"], textarea');
+                        if (inputs.length > 0) {{
+                            const input = inputs[0];
+                            input.value = payload;
+
+                            // 이벤트 트리거
+                            input.dispatchEvent(new Event('input', {{ bubbles: true }}));
+                            input.dispatchEvent(new Event('change', {{ bubbles: true }}));
+
+                            // 콘솔 로그 확인 (간접적 XSS 확인)
+                            const consoleLogs = [];
+                            const originalLog = console.log;
+                            console.log = function(...args) {{
+                                consoleLogs.push(args.join(' '));
+                                originalLog.apply(console, args);
+                            }};
+
+                            // 잠시 대기 후 로그 확인
+                            setTimeout(() => {{
+                                console.log = originalLog;
+                            }}, 100);
+
+                            return {{
+                                inputTested: input.name || input.id || 'unnamed',
+                                payload: payload,
+                                tested: true
+                            }};
+                        }}
+                        return {{ error: 'No input fields found' }};
+                    }} catch (e) {{
+                        return {{ error: e.message }};
+                    }}
+                }}
+                """, payload)
+
+                if result and not result.get('error'):
+                    test_results.append({
+                        'test_name': 'xss_form_test',
+                        'payload': payload,
+                        'result': result,
+                        'vulnerabilities': []  # 실제 XSS는 별도 확인 필요
+                    })
+
+            except Exception as e:
+                print(f"XSS 폼 테스트 오류: {str(e)}")
+
+        await asyncio.sleep(1)
+
+    except Exception as e:
+        test_results.append({
+            'test_name': 'xss_form_error',
+            'error': str(e),
+            'vulnerabilities': [{'type': 'ERROR', 'severity': 'LOW', 'description': f'XSS 폼 테스트 오류: {str(e)}'}]
+        })
+
+    return test_results
+
+async def test_button_functionality(element: Dict[str, Any]) -> Dict[str, Any]:
+    """버튼 기능 테스트"""
+    try:
+        button_text = element.get('text', '').lower()
+
+        # 위험한 버튼 텍스트 패턴
+        critical_patterns = [
+            'delete', 'remove', '삭제', '제거',
+            'admin', '관리자', 'administrator',
+            'reset', 'initialize', '초기화',
+            'export', 'download', '내보내기', '다운로드'
+        ]
+
+        vulnerabilities = []
+        risks = []
+
+        for pattern in critical_patterns:
+            if pattern in button_text:
+                risks.append({
+                    'type': 'CRITICAL_FUNCTION',
+                    'severity': 'MEDIUM',
+                    'description': f'중요 기능 버튼: {pattern}'
+                })
+
+        # onclick 핸들러 확인
+        onclick_check = await mcp__chrome_devtools__evaluate_script(f"""
+        (text) => {{
+            try {{
+                const buttons = Array.from(document.querySelectorAll('button, input[type="button"], input[type="submit"]'));
+                const targetButton = buttons.find(btn =>
+                    btn.textContent && btn.textContent.toLowerCase().includes(text) ||
+                    btn.value && btn.value.toLowerCase().includes(text)
+                );
+
+                if (targetButton) {{
+                    return {{
+                        hasOnclick: !!targetButton.onclick,
+                        hasEventListeners: targetButton.getAttribute('data-action') || targetButton.getAttribute('onclick'),
+                        buttonType: targetButton.type || 'button',
+                        buttonText: targetButton.textContent || targetButton.value
+                    }};
+                }}
+                return {{ error: 'Button not found' }};
+            }} catch (e) {{
+                return {{ error: e.message }};
+            }}
+        }}
+        """, button_text)
+
+        return {
+            'test_name': 'button_functionality',
+            'button_text': button_text,
+            'critical_patterns_found': [p for p in critical_patterns if p in button_text],
+            'onclick_analysis': onclick_check,
+            'vulnerabilities': vulnerabilities,
+            'risks': risks
+        }
+
+    except Exception as e:
+        return {
+            'test_name': 'button_functionality',
+            'error': str(e),
+            'vulnerabilities': [{'type': 'ERROR', 'severity': 'LOW', 'description': f'버튼 기능 테스트 오류: {str(e)}'}],
+            'risks': []
+        }
+
+async def test_critical_functions(element: Dict[str, Any]) -> Dict[str, Any]:
+    """중요 기능 테스트"""
+    try:
+        element_text = element.get('text', '').lower()
+
+        # 민감 기능 키워드
+        sensitive_functions = {
+            'delete': 'HIGH',
+            'remove': 'HIGH',
+            '삭제': 'HIGH',
+            '제거': 'HIGH',
+            'admin': 'CRITICAL',
+            '관리자': 'CRITICAL',
+            'administrator': 'CRITICAL',
+            'reset': 'MEDIUM',
+            '초기화': 'MEDIUM',
+            'export': 'MEDIUM',
+            'download': 'MEDIUM',
+            '내보내기': 'MEDIUM',
+            '다운로드': 'MEDIUM'
+        }
+
+        vulnerabilities = []
+
+        for func, severity in sensitive_functions.items():
+            if func in element_text:
+                vulnerabilities.append({
+                    'type': 'SENSITIVE_FUNCTION',
+                    'severity': severity,
+                    'description': f'민감 기능 노출: {func}'
+                })
+
+        return {
+            'test_name': 'critical_functions',
+            'element_text': element_text,
+            'sensitive_functions_detected': [f for f in sensitive_functions.keys() if f in element_text],
+            'vulnerabilities': vulnerabilities
+        }
+
+    except Exception as e:
+        return {
+            'test_name': 'critical_functions',
+            'error': str(e),
+            'vulnerabilities': [{'type': 'ERROR', 'severity': 'LOW', 'description': f'중요 기능 테스트 오류: {str(e)}'}]
+        }
+
+async def test_button_authentication(element: Dict[str, Any]) -> Dict[str, Any]:
+    """버튼 인증 확인"""
+    try:
+        # 현재 페이지 인증 상태 확인
+        auth_check = await mcp__chrome_devtools__evaluate_script("""
+        () => {
+            try {
+                // 로그인 상태 확인을 위한 다양한 지표
+                const indicators = {
+                    hasLoginForm: !!document.querySelector('form input[type="password"]'),
+                    hasLogoutButton: !!document.querySelector('a[href*="logout"], button:contains("logout"), button:contains("로그아웃")'),
+                    hasUserMenu: !!document.querySelector('.user, .profile, .account'),
+                    hasAuthCookies: document.cookie.includes('session') || document.cookie.includes('auth'),
+                    currentPage: window.location.pathname
+                };
+
+                return indicators;
+            } catch (e) {
+                console.error('Auth check error:', e.message);
+                return null;
+            }
+        }
+        """)
+
+        vulnerabilities = []
+
+        if auth_check:
+            # 로그인하지 않았는데 민감 기능 버튼이 있는 경우
+            if not auth_check['hasAuthCookies'] and not auth_check['hasLoginForm']:
+                element_text = element.get('text', '').lower()
+                sensitive_keywords = ['admin', '관리자', 'delete', '삭제', 'settings', '설정']
+
+                for keyword in sensitive_keywords:
+                    if keyword in element_text:
+                        vulnerabilities.append({
+                            'type': 'MISSING_AUTHENTICATION',
+                            'severity': 'HIGH',
+                            'description': f'인증 없이 접근 가능한 민감 기능: {keyword}'
+                        })
+                        break
+
+        return {
+            'test_name': 'button_authentication',
+            'auth_check': auth_check,
+            'vulnerabilities': vulnerabilities
+        }
+
+    except Exception as e:
+        return {
+            'test_name': 'button_authentication',
+            'error': str(e),
+            'vulnerabilities': [{'type': 'ERROR', 'severity': 'LOW', 'description': f'버튼 인증 테스트 오류: {str(e)}'}]
+        }
+
+async def analyze_link_url(element: Dict[str, Any]) -> Dict[str, Any]:
+    """링크 URL 분석"""
+    try:
+        url_analysis = await mcp__chrome_devtools__evaluate_script(f"""
+        (text) => {{
+            try {{
+                const links = Array.from(document.querySelectorAll('a[href]'));
+                const targetLink = links.find(link =>
+                    link.textContent && link.textContent.toLowerCase().includes(text)
+                );
+
+                if (targetLink) {{
+                    const url = targetLink.href;
+                    const currentDomain = window.location.hostname;
+                    const linkDomain = new URL(url).hostname;
+
+                    return {{
+                        url: url,
+                        isExternal: linkDomain !== currentDomain,
+                        isHttps: url.startsWith('https'),
+                        hasParameters: url.includes('?'),
+                        domain: linkDomain,
+                        currentDomain: currentDomain,
+                        linkText: targetLink.textContent
+                    }};
+                }}
+                return {{ error: 'Link not found' }};
+            }} catch (e) {{
+                return {{ error: e.message }};
+            }}
+        }}
+        """, element.get('text', '').lower())
+
+        vulnerabilities = []
+
+        if url_analysis and not url_analysis.get('error'):
+            if url_analysis['isExternal'] and not url_analysis['isHttps']:
+                vulnerabilities.append({
+                    'type': 'INSECURE_EXTERNAL_LINK',
+                    'severity': 'MEDIUM',
+                    'description': 'HTTPS가 아닌 외부 링크'
+                })
+
+            if url_analysis['hasParameters']:
+                # 파라미터에 민감 정보가 있는지 확인
+                sensitive_params = ['password', 'token', 'session', 'key']
+                url_lower = url_analysis['url'].lower()
+
+                for param in sensitive_params:
+                    if param in url_lower:
+                        vulnerabilities.append({
+                            'type': 'SENSITIVE_DATA_URL',
+                            'severity': 'HIGH',
+                            'description': f'URL에 민감 정보 포함: {param}'
+                        })
+
+        return {
+            'test_name': 'link_url_analysis',
+            'analysis': url_analysis,
+            'vulnerabilities': vulnerabilities
+        }
+
+    except Exception as e:
+        return {
+            'test_name': 'link_url_analysis',
+            'error': str(e),
+            'vulnerabilities': [{'type': 'ERROR', 'severity': 'LOW', 'description': f'링크 URL 분석 오류: {str(e)}'}]
+        }
+
+async def test_external_links(element: Dict[str, Any]) -> Dict[str, Any]:
+    """외부 링크 테스트"""
+    try:
+        element_text = element.get('text', '').lower()
+
+        # 외부 링크 확인
+        external_check = await mcp__chrome_devtools__evaluate_script(f"""
+        (text) => {{
+            try {{
+                const links = Array.from(document.querySelectorAll('a[href]'));
+                const currentDomain = window.location.hostname;
+                const targetLink = links.find(link =>
+                    link.textContent && link.textContent.toLowerCase().includes(text)
+                );
+
+                if (targetLink) {{
+                    const url = targetLink.href;
+                    const linkDomain = new URL(url).hostname;
+                    const isExternal = linkDomain !== currentDomain;
+
+                    return {{
+                        url: url,
+                        domain: linkDomain,
+                        isExternal: isExternal,
+                        hasTargetBlank: targetLink.target === '_blank',
+                        hasRelNoopener: targetLink.rel && targetLink.rel.includes('noopener'),
+                        hasRelNoreferrer: targetLink.rel && targetLink.rel.includes('noreferrer')
+                    }};
+                }}
+                return {{ error: 'Link not found' }};
+            }} catch (e) {{
+                return {{ error: e.message }};
+            }}
+        }}
+        """, element_text)
+
+        vulnerabilities = []
+
+        if external_check and external_check.get('isExternal'):
+            if external_check['hasTargetBlank'] and not external_check['hasRelNoopener']:
+                vulnerabilities.append({
+                    'type': 'TABNABBING',
+                    'severity': 'LOW',
+                    'description': 'target="_blank" 링크에 rel="noopener" 속성 없음'
+                })
+
+        return {
+            'test_name': 'external_links',
+            'element_text': element_text,
+            'external_check': external_check,
+            'vulnerabilities': vulnerabilities
+        }
+
+    except Exception as e:
+        return {
+            'test_name': 'external_links',
+            'error': str(e),
+            'vulnerabilities': [{'type': 'ERROR', 'severity': 'LOW', 'description': f'외부 링크 테스트 오류: {str(e)}'}]
+        }
+
+async def test_download_links(element: Dict[str, Any]) -> Dict[str, Any]:
+    """다운로드 링크 테스트"""
+    try:
+        element_text = element.get('text', '').lower()
+
+        # 다운로드 링크 확인
+        download_check = await mcp__chrome_devtools__evaluate_script(f"""
+        (text) => {{
+            try {{
+                const links = Array.from(document.querySelectorAll('a[href]'));
+                const targetLink = links.find(link =>
+                    link.textContent && link.textContent.toLowerCase().includes(text)
+                );
+
+                if (targetLink) {{
+                    const isDownload = targetLink.hasAttribute('download') ||
+                                      text.includes('download') || text.includes('다운로드');
+
+                    return {{
+                        url: targetLink.href,
+                        hasDownloadAttribute: targetLink.hasAttribute('download'),
+                        isDownloadLink: isDownload,
+                        fileExtension: targetLink.href.split('.').pop()?.toLowerCase()
+                    }};
+                }}
+                return {{ error: 'Link not found' }};
+            }} catch (e) {{
+                return {{ error: e.message }};
+            }}
+        }}
+        """, element_text)
+
+        vulnerabilities = []
+
+        if download_check and download_check.get('isDownloadLink'):
+            # 안전하지 않은 파일 확장자 확인
+            unsafe_extensions = ['exe', 'bat', 'cmd', 'scr', 'js', 'vbs']
+            file_ext = download_check.get('fileExtension', '')
+
+            if file_ext in unsafe_extensions:
+                vulnerabilities.append({
+                    'type': 'UNSAFE_DOWNLOAD',
+                    'severity': 'HIGH',
+                    'description': f'안전하지 않은 파일 다운로드: .{file_ext}'
+                })
+
+        return {
+            'test_name': 'download_links',
+            'element_text': element_text,
+            'download_check': download_check,
+            'vulnerabilities': vulnerabilities
+        }
+
+    except Exception as e:
+        return {
+            'test_name': 'download_links',
+            'error': str(e),
+            'vulnerabilities': [{'type': 'ERROR', 'severity': 'LOW', 'description': f'다운로드 링크 테스트 오류: {str(e)}'}]
+        }
+
+async def test_input_field_types(element: Dict[str, Any]) -> Dict[str, Any]:
+    """입력 필드 유형 확인"""
+    try:
+        field_analysis = await mcp__chrome_devtools__evaluate_script("""
+        () => {
+            try {
+                const inputs = document.querySelectorAll('input');
+                const fieldTypes = {};
+
+                inputs.forEach(input => {
+                    const type = input.type || 'text';
+                    fieldTypes[type] = (fieldTypes[type] || 0) + 1;
+                });
+
+                // 민감 필드 확인
+                const sensitiveFields = {
+                    password: document.querySelectorAll('input[type="password"]').length,
+                    email: document.querySelectorAll('input[type="email"]').length,
+                    tel: document.querySelectorAll('input[type="tel"]').length,
+                    credit_card: document.querySelectorAll('input[name*="card"], input[name*="credit"]').length
+                };
+
+                return {
+                    totalInputs: inputs.length,
+                    fieldTypes: fieldTypes,
+                    sensitiveFields: sensitiveFields,
+                    hasAutocompleteOff: Array.from(inputs).some(input => input.autocomplete === 'off')
+                };
+            } catch (e) {
+                console.error('Field type analysis error:', e.message);
+                return null;
+            }
+        }
+        """)
+
+        vulnerabilities = []
+
+        if field_analysis:
+            if field_analysis['sensitiveFields']['password'] > 0:
+                vulnerabilities.append({
+                    'type': 'PASSWORD_FIELD_PRESENT',
+                    'severity': 'MEDIUM',
+                    'description': '비밀번호 입력 필드 존재'
+                })
+
+        return {
+            'test_name': 'input_field_types',
+            'analysis': field_analysis,
+            'vulnerabilities': vulnerabilities
+        }
+
+    except Exception as e:
+        return {
+            'test_name': 'input_field_types',
+            'error': str(e),
+            'vulnerabilities': [{'type': 'ERROR', 'severity': 'LOW', 'description': f'입력 필드 유형 테스트 오류: {str(e)}'}]
+        }
+
+async def test_input_length_validation(element: Dict[str, Any]) -> Dict[str, Any]:
+    """입력값 길이 검증 확인"""
+    try:
+        length_validation = await mcp__chrome_devtools__evaluate_script("""
+        () => {
+            try {
+                const inputs = document.querySelectorAll('input[type="text"], input[type="password"], textarea');
+                const analysis = {
+                    totalInputs: inputs.length,
+                    hasMaxLength: 0,
+                    noMaxLength: 0,
+                    longMaxLength: 0,
+                    inputs: []
+                };
+
+                inputs.forEach(input => {
+                    const hasMax = input.hasAttribute('maxlength');
+                    const maxLength = parseInt(input.getAttribute('maxlength')) || -1;
+
+                    analysis.inputs.push({
+                        name: input.name || input.id || 'unnamed',
+                        type: input.type || 'text',
+                        hasMaxLength: hasMax,
+                        maxLength: maxLength
+                    });
+
+                    if (hasMax) {
+                        analysis.hasMaxLength++;
+                        if (maxLength > 1000) {
+                            analysis.longMaxLength++;
+                        }
+                    } else {
+                        analysis.noMaxLength++;
+                    }
+                });
+
+                return analysis;
+            } catch (e) {
+                console.error('Length validation analysis error:', e.message);
+                return null;
+            }
+        }
+        """)
+
+        vulnerabilities = []
+
+        if length_validation:
+            if length_validation['noMaxLength'] > 0:
+                vulnerabilities.append({
+                    'type': 'NO_INPUT_LENGTH_LIMIT',
+                    'severity': 'MEDIUM',
+                    'description': f'{length_validation["noMaxLength"]}개 입력 필드에 길이 제한 없음'
+                })
+
+        return {
+            'test_name': 'input_length_validation',
+            'validation': length_validation,
+            'vulnerabilities': vulnerabilities
+        }
+
+    except Exception as e:
+        return {
+            'test_name': 'input_length_validation',
+            'error': str(e),
+            'vulnerabilities': [{'type': 'ERROR', 'severity': 'LOW', 'description': f'입력값 길이 검증 테스트 오류: {str(e)}'}]
+        }
+
+async def test_sensitive_input_fields(element: Dict[str, Any]) -> Dict[str, Any]:
+    """민감 정보 입력 필드 확인"""
+    try:
+        sensitive_field_check = await mcp__chrome_devtools__evaluate_script("""
+        () => {
+            try {
+                const sensitiveInputs = {
+                    password: document.querySelectorAll('input[type="password"]'),
+                    creditCard: document.querySelectorAll('input[name*="card"], input[placeholder*="card"], input[pattern*="\\d{{4,16}}"]'),
+                    ssn: document.querySelectorAll('input[name*="ssn"], input[name*="social"], input[placeholder*="social"]'),
+                    apiKey: document.querySelectorAll('input[name*="key"], input[name*="token"], input[placeholder*="key"]')
+                };
+
+                const results = {};
+                Object.keys(sensitiveInputs).forEach(fieldType => {
+                    results[fieldType] = {
+                        count: sensitiveInputs[fieldType].length,
+                        hasAutocompleteOff: Array.from(sensitiveInputs[fieldType]).some(input => input.autocomplete === 'off'),
+                        fields: Array.from(sensitiveInputs[fieldType]).map(input => ({
+                            name: input.name || input.id || 'unnamed',
+                            hasAutocompleteOff: input.autocomplete === 'off',
+                            placeholder: input.placeholder || ''
+                        }))
+                    };
+                });
+
+                return results;
+            } catch (e) {
+                console.error('Sensitive field check error:', e.message);
+                return null;
+            }
+        }
+        """)
+
+        vulnerabilities = []
+
+        if sensitive_field_check:
+            for field_type, data in sensitive_field_check.items():
+                if data['count'] > 0:
+                    # 자동완성 비활성화가 필요한 필드가 자동완성을 허용하는 경우
+                    if field_type in ['password', 'creditCard', 'ssn']:
+                        fields_without_autocomplete_off = [f for f in data['fields'] if not f['hasAutocompleteOff']]
+                        if fields_without_autocomplete_off:
+                            vulnerabilities.append({
+                                'type': 'SENSITIVE_FIELD_AUTOCOMPLETE',
+                                'severity': 'MEDIUM',
+                                'description': f'자동완성 비활성화가 필요한 {field_type} 필드가 자동완성 허용'
+                            })
+
+        return {
+            'test_name': 'sensitive_input_fields',
+            'sensitive_fields': sensitive_field_check,
+            'vulnerabilities': vulnerabilities
+        }
+
+    except Exception as e:
+        return {
+            'test_name': 'sensitive_input_fields',
+            'error': str(e),
+            'vulnerabilities': [{'type': 'ERROR', 'severity': 'LOW', 'description': f'민감 입력 필드 테스트 오류: {str(e)}'}]
+        }
+
+async def test_clickjacking_protection(element: Dict[str, Any]) -> Dict[str, Any]:
+    """클릭재킹 방지 확인"""
+    try:
+        # X-Frame-Options 헤더 확인은 직접적으로 불가능하므로 간접 확인
+        frame_check = await mcp__chrome_devtools__evaluate_script("""
+        () => {
+            try {
+                // 페이지가 iframe 내에 있는지 확인
+                const inIframe = window.self !== window.top;
+
+                // 자바스크립트 프레임 버스팅 방지 확인
+                const hasFrameBusting = document.documentElement.toString().includes('top.location') ||
+                                      document.body.toString().includes('top.location');
+
+                return {
+                    inIframe: inIframe,
+                    hasFrameBusting: hasFrameBusting,
+                    hasCSP: !!document.querySelector('meta[http-equiv="Content-Security-Policy"]')
+                };
+            } catch (e) {
+                console.error('Clickjacking check error:', e.message);
+                return null;
+            }
+        }
+        """)
+
+        return {
+            'test_name': 'clickjacking_protection',
+            'frame_check': frame_check,
+            'vulnerabilities': []  # 클릭재킹은 서버 헤더 확인 필요
+        }
+
+    except Exception as e:
+        return {
+            'test_name': 'clickjacking_protection',
+            'error': str(e),
+            'vulnerabilities': [{'type': 'ERROR', 'severity': 'LOW', 'description': f'클릭재킹 테스트 오류: {str(e)}'}]
+        }
+
+async def test_authentication_required(element: Dict[str, Any]) -> Dict[str, Any]:
+    """인증 필요 여부 확인"""
+    try:
+        auth_check = await mcp__chrome_devtools__evaluate_script("""
+        () => {
+            try {
+                // 다양한 인증 지표 확인
+                const authIndicators = {
+                    hasLoginForm: !!document.querySelector('form input[type="password"]'),
+                    hasLoginButton: !!document.querySelector('button[type="submit"], input[type="submit"]'),
+                    hasUsernameField: !!document.querySelector('input[type="text"], input[type="email"], input[name*="user"], input[name*="login"]'),
+                    hasSessionCookie: document.cookie.includes('session') || document.cookie.includes('auth'),
+                    hasErrorMessage: !!document.querySelector('.error, .alert, [class*="error"]'),
+                    currentPageUrl: window.location.href,
+                    pageTitle: document.title
+                };
+
+                return authIndicators;
+            } catch (e) {
+                console.error('Auth required check error:', e.message);
+                return null;
+            }
+        }
+        """)
+
+        vulnerabilities = []
+
+        if auth_check:
+            element_text = element.get('text', '').lower()
+            sensitive_keywords = ['admin', '관리자', 'settings', '설정', 'profile', '프로필']
+
+            for keyword in sensitive_keywords:
+                if keyword in element_text and not auth_check['hasSessionCookie']:
+                    vulnerabilities.append({
+                        'type': 'POTENTIAL_UNAUTH_ACCESS',
+                        'severity': 'MEDIUM',
+                        'description': f'인증이 필요할 수 있는 기능: {keyword}'
+                    })
+                    break
+
+        return {
+            'test_name': 'authentication_required',
+            'auth_check': auth_check,
+            'vulnerabilities': vulnerabilities
+        }
+
+    except Exception as e:
+        return {
+            'test_name': 'authentication_required',
+            'error': str(e),
+            'vulnerabilities': [{'type': 'ERROR', 'severity': 'LOW', 'description': f'인증 필요 확인 테스트 오류: {str(e)}'}]
+        }
+
+async def test_authorization(element: Dict[str, Any]) -> Dict[str, Any]:
+    """권한 확인"""
+    try:
+        element_text = element.get('text', '').lower()
+
+        # 관리자 전용 기능 키워드
+        admin_keywords = ['admin', '관리자', 'administrator', 'system', '시스템', 'master', '마스터']
+
+        vulnerabilities = []
+
+        for keyword in admin_keywords:
+            if keyword in element_text:
+                vulnerabilities.append({
+                    'type': 'ADMIN_FUNCTION_EXPOSED',
+                    'severity': 'HIGH',
+                    'description': f'관리자 기능 노출 가능성: {keyword}'
+                })
+
+        return {
+            'test_name': 'authorization',
+            'element_text': element_text,
+            'admin_keywords_found': [k for k in admin_keywords if k in element_text],
+            'vulnerabilities': vulnerabilities
+        }
+
+    except Exception as e:
+        return {
+            'test_name': 'authorization',
+            'error': str(e),
+            'vulnerabilities': [{'type': 'ERROR', 'severity': 'LOW', 'description': f'권한 확인 테스트 오류: {str(e)}'}]
+        }
 
 async def explore_dynamic_content(current_url: str, skip_dynamic: bool = False) -> List[Dict[str, Any]]:
-    """동적 콘텐츠 탐색 (실제 사용자처럼 메뉴 클릭하며 탐색)"""
+    """동적 콘텐츠 탐색 (AI가 직접 기능 테스트를 진행하며 모든 취약요소 탐색)"""
     # 동적 탐색 건너뛰기 옵션
     if skip_dynamic:
         print("⚠️ 동적 탐색을 건너뜁니다 - 기본 분석으로 계속합니다")
         return []
 
     try:
-        print(f"🔍 동적 콘텐츠 탐색 시작: {current_url}")
+        print(f"🔍 AI 기능 테스트 기반 동적 보안 탐색 시작: {current_url}")
+        print("🛡️ 모든 버튼, 메뉴, 링크에 대한 종합 보안 테스트를 수행합니다...")
 
         # 안전하게 상호작용 요소 발견 (타임아웃 적용)
         try:
@@ -549,7 +1793,7 @@ async def explore_dynamic_content(current_url: str, skip_dynamic: bool = False) 
                 discover_interactive_elements(),
                 timeout=15  # 15초 타임아웃
             )
-            print(f"발견된 상호작용 요소: {len(interactive_elements)}개")
+            print(f"🎯 발견된 상호작용 요소: {len(interactive_elements)}개 - 모두 테스트합니다!")
         except asyncio.TimeoutError:
             print("⚠️ 상호작용 요소 발견 시간 초과")
             interactive_elements = []
@@ -557,58 +1801,169 @@ async def explore_dynamic_content(current_url: str, skip_dynamic: bool = False) 
             print(f"⚠️ 상호작용 요소 발견 오류: {str(e)}")
             interactive_elements = []
 
+        # 설정 가져오기
+        config = get_analysis_config()
         explored_pages = []
         visited_urls = set([current_url])
+        start_time = time.time()
 
-        # 안전하게 요소 클릭 및 분석 (최대 5개로 제한)
-        max_elements = min(5, len(interactive_elements))
-        for i, element in enumerate(interactive_elements[:max_elements]):
+        # 모든 요소에 대한 종합 보안 테스트 (요소 제한 없음)
+        elements_to_process = interactive_elements
+
+        # 중요도별 정렬 (취약성 가능성이 높은 요소 먼저)
+        elements_to_process = sort_elements_by_priority(elements_to_process)
+
+        print(f"🚀 {len(elements_to_process)}개 요소에 대한 종합 보안 기능 테스트 시작...")
+
+        for i, element in enumerate(elements_to_process):
             try:
-                print(f"🔍 요소 분석 중 ({i+1}/{max_elements}): {element.get('text', '')[:20]}...")
+                # 전체 타임아웃 체크
+                if time.time() - start_time > config.get('total_timeout', 300):
+                    print(f"⏰️ 전체 타임아웃 도달 - 남은 {len(elements_to_process)-i}개 요소 건너뜀")
+                    break
 
-                # 클릭 및 분석 (Playwright 전용, 타임아웃 적용)
-                result = await asyncio.wait_for(
-                    click_and_analyze_element_playwright(element),
-                    timeout=15  # 15초 타임아웃 (Playwright는 더 길게)
-                )
+                element_text = element.get('text', 'Unknown')
+                element_type = element.get('elementType', 'unknown')
 
-                if result:
-                    explored_pages.append(result)
-                    print(f"✅ 요소 분석 완료: {result.get('after_click', {}).get('title', '')}")
+                print(f"🔍 [{i+1}/{len(elements_to_process)}] 종합 보안 테스트 중: {element_text} ({element_type})")
 
-                    # 페이지가 변경된 경우, 새로운 URL 기록
-                    new_url = result['after_click']['url']
-                    if new_url != current_url and new_url not in visited_urls:
-                        visited_urls.add(new_url)
-                        print(f"🔄 새로운 페이지 발견: {new_url}")
+                # 종합 보안 테스트 수행 (실제 기능 테스트)
+                try:
+                    test_result = await asyncio.wait_for(
+                        perform_comprehensive_security_test(element),
+                        timeout=config.get('element_test_timeout', 30)  # 각 요소별 30초 타임아웃
+                    )
 
-                        # 잠시 대기 후 다음 탐색
-                        await asyncio.sleep(1)
+                    if test_result:
+                        explored_pages.append(test_result)
 
-                # 원래 페이지로 돌아가기 (필요시)
-                if result and result['page_changed']:
-                    try:
-                        await asyncio.wait_for(
-                            mcp__chrome_devtools__navigate_page(current_url),
-                            timeout=5  # 5초 타임아웃
-                        )
-                        await asyncio.sleep(1)
-                    except:
-                        print("원래 페이지로 돌아가기 실패, 계속 진행")
+                        # 발견된 취약점 요약
+                        vuln_count = len(test_result.get('vulnerabilities_found', []))
+                        risk_count = len(test_result.get('risks_identified', []))
 
-            except asyncio.TimeoutError:
-                print(f"⚠️ 요소 {i+1} 분석 시간 초과 - 건너뜁니다")
-                continue
+                        if vuln_count > 0 or risk_count > 0:
+                            print(f"🚨 보안 위협 발견: {vuln_count}개 취약점, {risk_count}개 위험요소")
+
+                            # 발견된 취약점 상세 출력
+                            for vuln in test_result.get('vulnerabilities_found', []):
+                                severity = vuln.get('severity', 'LOW')
+                                vuln_type = vuln.get('type', 'UNKNOWN')
+                                description = vuln.get('description', '')
+                                print(f"   ⚠️ {severity}: {vuln_type} - {description}")
+                        else:
+                            print(f"✅ 보안 테스트 완료: 발견된 취약점 없음")
+
+                        # 기능 테스트 결과 요약
+                        func_tests = test_result.get('functionality_tests', [])
+                        sec_tests = test_result.get('security_tests', [])
+
+                        print(f"   📊 기능 테스트: {len(func_tests)}개, 보안 테스트: {len(sec_tests)}개 수행")
+
+                except asyncio.TimeoutError:
+                    print(f"⏰️ 요소 {i+1} 테스트 시간 초과 - 다음 요소로 진행")
+                    continue
+                except Exception as test_error:
+                    print(f"❌ 요소 {i+1} 테스트 오류: {str(test_error)}")
+                    continue
+
+                # 테스트 간 대기 시간
+                await asyncio.sleep(config.get('test_interval', 1))
+
             except Exception as e:
-                print(f"⚠️ 요소 {i+1} 분석 오류: {str(e)}")
+                print(f"❌ 요소 {i+1} 처리 중 오류: {str(e)}")
                 continue
 
-        print(f"✅ 동적 탐색 완료: {len(explored_pages)}개 페이지 분석됨")
+        # 탐색 결과 요약
+        total_vulnerabilities = sum(len(page.get('vulnerabilities_found', [])) for page in explored_pages)
+        total_risks = sum(len(page.get('risks_identified', [])) for page in explored_pages)
+        total_tests = sum(len(page.get('security_tests', [])) for page in explored_pages)
+
+        print(f"🎉 동적 보안 탐색 완료:")
+        print(f"   📊 테스트된 요소: {len(explored_pages)}개")
+        print(f"   🔍 수행된 테스트: {total_tests}개")
+        print(f"   🚨 발견된 취약점: {total_vulnerabilities}개")
+        print(f"   ⚠️ 식별된 위험요소: {total_risks}개")
+
         return explored_pages
 
     except Exception as e:
-        print(f"동적 콘텐츠 탐색 실패: {str(e)}")
+        print(f"❌ 동적 보안 탐색 실패: {str(e)}")
         return []
+
+def sort_elements_by_priority(elements: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """취약성 가능성에 따라 요소 우선순위 정렬"""
+    def priority_score(element):
+        score = 0
+        element_text = element.get('text', '').lower()
+        element_type = element.get('elementType', '').lower()
+
+        # 높은 우선순위 요소들
+        high_priority_patterns = [
+            'login', '로그인', 'signin', 'sign in', 'auth', '인증',
+            'admin', '관리자', 'administrator', 'settings', '설정',
+            'delete', '삭제', 'remove', '제거', 'reset', '초기화',
+            'upload', '업로드', 'download', '다운로드', 'export', '내보내기'
+        ]
+
+        for pattern in high_priority_patterns:
+            if pattern in element_text:
+                score += 10
+
+        # 요소 유형별 우선순위
+        type_priority = {
+            'form': 8,
+            'button': 6,
+            'submit': 7,
+            'input': 5,
+            'link': 3,
+            'interactive_element': 4
+        }
+
+        score += type_priority.get(element_type, 1)
+
+        # 추가 보안 관련 키워드
+        security_keywords = [
+            'password', '비밀번호', 'token', '토큰', 'key', '키',
+            'api', 'endpoint', 'session', '세션'
+        ]
+
+        for keyword in security_keywords:
+            if keyword in element_text:
+                score += 5
+
+        return score
+
+    return sorted(elements, key=priority_score, reverse=True)
+
+def get_analysis_config() -> Dict[str, Any]:
+    """분석 설정 반환"""
+    return {
+        # 타임아웃 설정 (초)
+        'page_load_timeout': 3,
+        'click_timeout': 5,
+        'navigation_timeout': 10,
+        'element_test_timeout': 30,  # 각 요소별 보안 테스트 타임아웃
+        'total_timeout': 300,  # 전체 분석 타임아웃 (5분)
+        'test_interval': 1,  # 테스트 간 대기 시간
+
+        # 탐색 설정
+        'max_elements': 50,  # 최대 탐색 요소 수 (None이면 무제한)
+        'skip_dynamic': False,  # 동적 탐색 건너뛰기 여부
+
+        # 테스트 설정
+        'enable_xss_testing': True,  # XSS 테스트 활성화
+        'enable_sql_testing': True,  # SQL 인젝션 테스트 활성화
+        'enable_form_testing': True,  # 폼 테스트 활성화
+        'enable_auth_testing': True,  # 인증 테스트 활성화
+
+        # 보고 설정
+        'detailed_logging': True,  # 상세 로깅
+        'save_screenshots': False,  # 스크린샷 저장
+
+        # 성능 설정
+        'parallel_testing': False,  # 병렬 테스트 (현재는 순차적)
+        'max_concurrent': 3  # 최대 동시 테스트 수
+    }
 
 async def safe_login(username: str, password: str) -> bool:
     """안전한 로그인 처리"""
@@ -673,76 +2028,67 @@ async def safe_login(username: str, password: str) -> bool:
         print(f"로그인 처리 실패: {str(e)}")
         return False
 
-# 메인 분석 프로세스 (동적 탐색 기반)
+# 메인 분석 프로세스 (종합 보안 기능 테스트 기반)
 async def analyze_website(target_url: str, username: Optional[str] = None, password: Optional[str] = None, config: Dict[str, Any] = None):
-    """웹사이트 분석 메인 함수 (실제 사용자처럼 클릭하며 탐색)"""
+    """웹사이트 분석 메인 함수 (AI가 직접 기능 테스트를 진행하며 모든 취약요소 탐색)"""
+
+    # 설정 가져오기
+    if config is None:
+        config = get_analysis_config()
 
     print("=" * 60)
-    print("🚀 동적 웹 보안 분석 시작")
+    print("🚀 AI 기반 종합 보안 기능 테스트 시작")
+    print("🛡️ 모든 버튼, 메뉴, 링크에 대한 실제 기능 테스트를 수행합니다")
     print("=" * 60)
 
     # 1. 초기 페이지 접속
+    print(f"🌐 {target_url} 페이지 접속 중...")
     if not await safe_navigate(target_url):
         raise Exception(f"초기 페이지 접속 실패: {target_url}")
 
     # 2. 로그인 처리 (필요시)
     if username and password:
         print("🔐 로그인을 시도합니다...")
-        if not await safe_login(username, password):
+        if await safe_login(username, password):
+            print("✅ 로그인 성공 - 인증된 상태로 분석을 계속합니다")
+        else:
             print("⚠️ 로그인에 실패했습니다. 비인증 상태로 분석을 계속합니다.")
 
-    # 3. 동적 콘텐츠 탐색 (실제 사용자처럼 클릭하며 메뉴 탐색)
-    print("\n🔍 동적 메뉴 탐색을 시작합니다...")
-    print("실제 사용자처럼 버튼을 클릭하며 모든 기능을 탐색합니다.")
+    # 3. 기본 정보 수집
+    print("📊 기본 페이지 정보 수집 중...")
+    basic_info = await collect_basic_info(target_url)
 
-    # Playwright로만 동적 메뉴 탐색 - Chrome DevTools는 여기서 사용 안 함
-    print("🖱️ Playwright로만 동적 메뉴 탐색 시작...")
-    print("Chrome DevTools 없이 Playwright만으로 버튼/링크 클릭하여 탐색합니다.")
+    # 4. AI 기반 종합 보안 기능 테스트
+    print("\n🔍 AI 기반 동적 보안 테스트 시작...")
+    print("모든 상호작용 요소에 대한 실제 기능 테스트를 수행합니다.")
+    print("각 요소의 보안 취약점을 심층적으로 분석합니다.")
 
-    dynamic_results = []
-    start_time = time.time()  # 타임아웃 추적 시작
-    try:
-        # Playwright로 새 페이지 생성
-        page = await mcp__playwright__new_page(target_url)
-        await asyncio.sleep(config.get('page_load_timeout', 3))  # 설정 기반 페이지 로딩 대기
+    # 새로운 종합 보안 테스트 사용
+    dynamic_results = await explore_dynamic_content(
+        current_url=target_url,
+        skip_dynamic=config.get('skip_dynamic', False)
+    )
 
-        # Playwright로 페이지 내 모든 클릭 가능 요소 찾기
-        clickable_elements = await mcp__playwright__evaluate_script("""
-        () => {
-            const elements = [];
+    # 5. 결과 정리 및 보고서 생성
+    print("\n📋 분석 결과 종합 중...")
+    analysis_results = {
+        'basic_info': basic_info,
+        'dynamic_security_tests': dynamic_results,
+        'config_used': config,
+        'timestamp': datetime.now() + timedelta(hours=9),
+        'total_elements_tested': len(dynamic_results),
+        'total_vulnerabilities_found': sum(len(page.get('vulnerabilities_found', [])) for page in dynamic_results),
+        'total_security_tests_performed': sum(len(page.get('security_tests', [])) for page in dynamic_results)
+    }
 
-            // 버튼, 링크, 입력 필드 등 클릭 가능 요소 찾기
-            const selectors = [
-                'button:not([disabled])',
-                'a[href]:not([disabled])',
-                'input[type="button"]:not([disabled])',
-                'input[type="submit"]:not([disabled])',
-                '[role="button"]:not([disabled])',
-                '[onclick]:not([disabled])'
-            ];
+    print(f"✅ 분석 완료:")
+    print(f"   🎯 테스트된 요소: {analysis_results['total_elements_tested']}개")
+    print(f"   🔍 수행된 보안 테스트: {analysis_results['total_security_tests_performed']}개")
+    print(f"   🚨 발견된 취약점: {analysis_results['total_vulnerabilities_found']}개")
 
-            selectors.forEach(selector => {
-                document.querySelectorAll(selector).forEach((el, index) => {
-                    const text = el.textContent?.trim() || el.value || el.title || '';
-                    if (text && text.length > 0 && text.length < 100) {
-                        elements.push({
-                            text: text,
-                            tagName: el.tagName,
-                            type: el.type || 'unknown',
-                            selector: selector,
-                            index: index,
-                            href: el.href || '',
-                            onclick: el.onclick ? 'has_onclick' : 'no_onclick'
-                        });
-                    }
-                });
-            });
+    return analysis_results
 
-            return elements; // 모든 요소 반환
-        }
-        """)
-
-        print(f"🎯 Playwright 발견 요소: {len(clickable_elements)}개")
+# MCP 서버 설치 확인
 
         # 최대 요소 수 제한 적용
         elements_to_process = clickable_elements

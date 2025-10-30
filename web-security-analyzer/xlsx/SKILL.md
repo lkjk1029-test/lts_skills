@@ -151,7 +151,10 @@ if not validate_dependencies():
 - **대상 URL**: 분석할 웹사이트의 기본 URL
 - **아이디**: 로그인이 필요한 경우 (선택사항)
 - **패스워드**: 로그인이 필요한 경우 (선택사항)
-- **분석 깊이**: 사이트 전체 또는 특정 영역 (기본값: 전체)
+- **분석 깊이**:
+  - `기본 (50개 요소, 5분)`: 빠른 분석
+  - `심층 (200개 요소, 10분)`: 상세 분석 (권장)
+  - `전체 (무제한, 15분)`: 최대 깊이 분석
 
 ### 3. 사이트 전체 탐색 및 크롤링
 
@@ -2039,11 +2042,11 @@ def get_analysis_config() -> Dict[str, Any]:
         'click_timeout': 5,
         'navigation_timeout': 10,
         'element_test_timeout': 30,  # 각 요소별 보안 테스트 타임아웃
-        'total_timeout': 300,  # 전체 분석 타임아웃 (5분)
+        'total_timeout': 900,  # 전체 분석 타임아웃 (15분)
         'test_interval': 1,  # 테스트 간 대기 시간
 
         # 탐색 설정
-        'max_elements': 50,  # 최대 탐색 요소 수 (None이면 무제한)
+        'max_elements': None,  # 최대 탐색 요소 수 (무제한)
         'skip_dynamic': False,  # 동적 탐색 건너뛰기 여부
 
         # 테스트 설정
